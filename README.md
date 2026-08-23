@@ -13,23 +13,10 @@ No es un tema ni un envoltorio de la interfaz oficial: es un **frontend distinto
 que habla con el harness por su API, servido desde el propio harness y metido en
 una ventana nativa.
 
-```
-┌──────────────────────────────────────────────────────────────┐
-│  Espacio de trabajo            modelo ▾   esfuerzo ▾   ⤢     │
-├───────────────┬───────────────────────────┬──────────────────┤
-│ En marcha  2  │                           │ SALA DE CONTROL  │
-│  · Informe    │   Conversación            │  · Informe  62%  │
-│  · Resumen    │                           │  · Resumen  18%  │
-│               │   ¿En qué te ayudo?       ├──────────────────┤
-│ Hoy        3  │                           │ ENTREGABLES      │
-│  · Notas      │                           │  informe.md      │
-│  · Borrador   │                           │  tabla.csv       │
-│               │  ┌─────────────────────┐  │ EN USO           │
-│ Skills        │  │ Escribe y pulsa ⏎   │  │ skills · agentes │
-│ Ajustes       │  └─────────────────────┘  │ plugins          │
-└───────────────┴───────────────────────────┴──────────────────┘
-       plegable            siempre                plegable
-```
+![Deepharn](docs/01-principal.png)
+
+*Tres columnas plegables: conversaciones a la izquierda, el chat en medio, y a la
+derecha lo que está corriendo, lo que ha producido y lo que tiene a mano.*
 
 ## Qué hace
 
@@ -46,6 +33,14 @@ una ventana nativa.
 
 La respuesta del agente se pinta según se escribe, y el texto se renderiza como
 markdown: párrafos, viñetas, código.
+
+## Por dentro
+
+| | |
+|---|---|
+| ![Modelos](docs/02-modelos.png) | **Modelo y esfuerzo.** Agrupados por proveedor y con filtro, porque OpenRouter ofrece más de cien. El esfuerzo de razonamiento sale de lo que declara cada modelo. |
+| ![Ajustes](docs/03-ajustes.png) | **Ajustes.** Proveedores activos, proyectos, skills con aviso si alguna está mal escrita, e instalador de plugins. Sin bajar a la terminal. |
+| ![Solo chat](docs/04-solo-chat.png) | **Solo chat.** Un botón pliega las dos columnas y deja la conversación sola. |
 
 ## Cómo está montado
 

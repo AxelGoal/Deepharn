@@ -205,7 +205,10 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 .prosa > p { margin: 0; }
 .prosa-h { margin: 3px 0 0; font-size: 15.5px; font-weight: 600; letter-spacing: -.005em; color: var(--tinta); }
 
-.prosa-lista { margin: 0; padding-left: 22px; display: flex; flex-direction: column; gap: 3px; }
+/* Nada de flex aquí: convierte los <li> en elementos flex y el navegador
+   deja de numerarlos — salían todos como «1.». */
+.prosa-lista { margin: 0; padding-left: 22px; }
+.prosa-lista li + li { margin-top: 3px; }
 .prosa-lista li { padding-left: 2px; }
 .prosa-lista li::marker { color: var(--texto4); }
 

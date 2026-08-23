@@ -272,7 +272,17 @@ function formatear(texto) {
     if (esViñeta(linea) || esNumerada(linea)) {
       const numerada = esNumerada(linea)
       const lista = el(numerada ? 'ol' : 'ul', { class: 'prosa-lista' })
-      while (i < lineas.length && (esViñeta(lineas[i]) || esNumerada(lineas[i]))) {
+      while (i < lineas.length) {
+        // Un hueco entre puntos no rompe la lista: los modelos separan los
+        // elementos con una línea en blanco y antes eso creaba dos listas,
+        // así que la numeración volvía a empezar en 1.
+        if (lineas[i].trim() === '') {
+          let j = i
+          while (j < lineas.length && lineas[j].trim() === '') j++
+          if (j < lineas.length && (esViñeta(lineas[j]) || esNumerada(lineas[j]))) { i = j; continue }
+          break
+        }
+        if (!esViñeta(lineas[i]) && !esNumerada(lineas[i])) break
         const limpio = lineas[i].replace(/^\s*(?:[-*•]|\d+[.)])\s+/, '')
         lista.append(enLinea(el('li'), limpio))
         i++
