@@ -1,0 +1,17 @@
+{
+  "name": "deepharn-front",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Sirve el frontend propio de Deepharn en /deepharn, mismo origen que /api.",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "lib",
+    "web"
+  ]
+}

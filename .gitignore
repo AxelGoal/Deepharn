@@ -1,0 +1,17 @@
+# Compilación de la app
+app/build/
+*.icns
+*.iconset/
+
+# Dependencias
+node_modules/
+pnpm-lock.yaml
+
+# macOS
+.DS_Store
+
+# Nada de esto debería existir aquí, pero por si acaso
+.env
+*.credentials.yaml
+*.key
+*.pem

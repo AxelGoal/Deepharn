@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Deepharn</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&family=Newsreader:opsz,wght@6..72,400;6..72,500&display=swap">
+<link rel="stylesheet" href="./estilo.css">
+</head>
+<body>
+
+<div class="marco" id="marco">
+
+  <header class="barra">
+    <div class="barra-izq">
+      <button class="icono" id="plegar-izq" title="Plegar conversaciones" aria-label="Plegar conversaciones">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="9" y1="4" x2="9" y2="20"/></svg>
+      </button>
+      <span class="sep"></span>
+      <div class="espacio" id="espacio">
+        <span class="espacio-marca" id="espacio-inicial">··</span>
+        <span class="espacio-textos">
+          <strong id="espacio-nombre">Cargando…</strong>
+          <small id="espacio-ruta" class="mono"></small>
+        </span>
+      </div>
+      <span class="pastilla oculto" id="pastilla-marcha"><i></i><span id="marcha-texto"></span></span>
+    </div>
+
+    <div class="barra-der">
+      <div class="envoltorio-modelo">
+        <button class="chip mono" id="modelo" aria-haspopup="listbox" aria-expanded="false">—</button>
+        <div class="menu-modelos oculto" id="menu-modelos" role="listbox"></div>
+      </div>
+      <div class="envoltorio-modelo">
+        <button class="chip" id="esfuerzo" aria-haspopup="listbox" aria-expanded="false">Esfuerzo</button>
+        <div class="menu-modelos oculto" id="menu-esfuerzo" role="listbox"></div>
+      </div>
+      <button class="boton" id="solo-chat">Solo chat</button>
+      <button class="icono" id="plegar-der" title="Plegar control" aria-label="Plegar control">
+        <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><line x1="15" y1="4" x2="15" y2="20"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="cuerpo">
+
+    <aside class="lateral" id="lateral">
+      <div class="lateral-alto">
+        <button class="boton-primario" id="nueva">
+          <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nueva conversación
+        </button>
+        <label class="buscador">
+          <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.7" y2="16.7"/></svg>
+          <input id="buscar" type="search" placeholder="Buscar" autocomplete="off">
+        </label>
+      </div>
+
+      <nav class="lista" id="lista"></nav>
+
+      <div class="lateral-bajo">
+        <button class="fila-menu" id="ir-skills">
+          <svg viewBox="0 0 24 24"><path d="M13 2 4 14h6l-1 8 9-12h-6l1-8z"/></svg>
+          <span>Skills</span><em class="mono" id="n-skills">—</em>
+        </button>
+        <button class="fila-menu" id="ir-ajustes">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-2.9 1.2V21a2 2 0 1 1-4 0v-.1A1.7 1.7 0 0 0 7 19.4a1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0-1.2-2.9"/></svg>
+          <span>Ajustes</span>
+        </button>
+        <button class="fila-menu" id="ir-conexiones">
+          <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7 0l3-3a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-3 3a5 5 0 0 0 7 7l1-1"/></svg>
+          <span>Conexiones</span><em class="mono" id="n-conexiones">—</em>
+        </button>
+      </div>
+    </aside>
+
+    <main class="centro">
+      <div class="centro-alto">
+        <div class="titulo-conv">
+          <strong id="conv-titulo">Sin conversación</strong>
+          <small class="mono" id="conv-hora"></small>
+        </div>
+      </div>
+
+      <div class="hilo" id="hilo">
+        <div class="vacio">Elige una conversación de la izquierda.</div>
+      </div>
+
+      <div class="compositor">
+        <div class="caja">
+          <textarea class="caja-texto" id="caja-texto" rows="1" placeholder="Escribe y pulsa Enter…"></textarea>
+          <div class="caja-pie">
+            <span class="mini">Adjuntar</span>
+            <span class="mini mono">@ Archivos</span>
+            <span class="crece"></span>
+            <span class="mono peq" id="tokens-sesion"></span>
+            <button class="enviar" id="enviar" aria-label="Enviar">
+              <svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <aside class="derecha" id="derecha">
+      <section class="panel">
+        <button class="panel-cabecera" data-plegar="control">
+          <span>Sala de control</span><em class="mono" id="n-control">0</em><i class="flecha">▾</i>
+        </button>
+        <div class="panel-cuerpo" id="control"></div>
+      </section>
+
+      <section class="panel">
+        <button class="panel-cabecera" data-plegar="entregables">
+          <span>Entregables</span><em class="mono" id="n-entregables">0</em><i class="flecha">▾</i>
+        </button>
+        <div class="panel-cuerpo" id="entregables"></div>
+      </section>
+
+      <section class="panel crece">
+        <button class="panel-cabecera" data-plegar="enuso">
+          <span>En uso</span><em class="mono" id="n-enuso"></em><i class="flecha">▾</i>
+        </button>
+        <div class="panel-cuerpo" id="enuso"></div>
+      </section>
+    </aside>
+
+  </div>
+</div>
+
+<div class="velo oculto" id="velo">
+  <div class="modal">
+    <header>
+      <strong>Ajustes</strong>
+      <button class="icono" id="cerrar-ajustes" aria-label="Cerrar">✕</button>
+    </header>
+    <div class="modal-cuerpo" id="ajustes-cuerpo"></div>
+    <footer>
+      <span class="peq">La configuración completa —modelos, credenciales, plugins— vive en la interfaz oficial.</span>
+      <button class="boton" id="abrir-oficial">Abrir configuración oficial</button>
+    </footer>
+  </div>
+</div>
+
+<script type="module" src="./app.js"></script>
+</body>
+</html>

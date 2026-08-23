@@ -1,0 +1,78 @@
+/* ── Deepharn ─────────────────────────────────────────────────────────────
+   Verde petróleo sobre papel gris verdoso. Si no hay internet, las fuentes
+   caen a las del sistema y todo lo demás sigue en pie.
+
+   Va con «html body» a propósito: la hoja de la app se inserta después que la
+   nuestra, así que por orden ganaría ella. Con un punto más de especificidad
+   ganamos nosotros sin recurrir a !important.                              */
+
+html body {
+  /* superficies */
+  --dsw-alias-bg-base: #FFFFFF;
+  --dsw-alias-bg-layer-1: #FFFFFF;
+  --dsw-alias-bg-layer-2: #FAFBF9;
+  --dsw-alias-bg-layer-3: #F7F8F6;
+  --dsw-alias-bg-module-platform: #EEF0ED;
+  --dsw-alias-bg-multi-select: #F2F4F1;
+  --dsw-alias-bg-overlay: #E7EAE6;
+  --dsw-alias-bg-skeleton: #1B211D0A;
+
+  /* interacción */
+  --dsw-alias-interactive-bg-hover: #14606A0F;
+  --dsw-alias-interactive-bg-hover-solid: #F2F4F1;
+  --dsw-alias-interactive-bg-active: #14606A1F;
+  --dsw-alias-interactive-bg-hover-accent: #14606A24;
+
+  /* líneas */
+  --dsw-alias-border-l1: #1B211D0A;
+  --dsw-alias-border-l2: #1B211D1A;
+  --dsw-alias-border-l2-darkmode-thin: #1B211D1A;
+  --dsw-alias-border-l3: #1B211D24;
+  --dsw-alias-border-l4: #1B211D33;
+
+  /* texto */
+  --dsw-alias-label-primary: #1B211D;
+  --dsw-alias-label-primary-dimmed: #2B312C;
+  --dsw-alias-label-secondary: #5C625D;
+  --dsw-alias-label-tertiary: #79807A;
+  --dsw-alias-label-caption: #9AA19B;
+
+  /* marca */
+  --dsw-alias-brand-primary: #145F63;
+  --dsw-alias-brand-text: #145F63;
+  --dsw-alias-brand-primary-new-colorprimary-new-color: #145F63;
+
+  /* tipografía */
+  font-family: Figtree, -apple-system, "system-ui", "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  --ds-font-family-code: "IBM Plex Mono", "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+}
+
+html body[data-ds-dark-theme] {
+  --dsw-alias-bg-base: #101613;
+  --dsw-alias-bg-layer-1: #161D19;
+  --dsw-alias-bg-layer-2: #1A221E;
+  --dsw-alias-bg-layer-3: #1E2723;
+  --dsw-alias-bg-module-platform: #0C1210;
+  --dsw-alias-bg-multi-select: #1A221E;
+  --dsw-alias-bg-overlay: #0A0F0D;
+
+  --dsw-alias-interactive-bg-hover: #7FC7C014;
+  --dsw-alias-interactive-bg-hover-solid: #1E2723;
+  --dsw-alias-interactive-bg-active: #7FC7C024;
+
+  --dsw-alias-border-l1: #E8F0EC0A;
+  --dsw-alias-border-l2: #E8F0EC1A;
+  --dsw-alias-border-l2-darkmode-thin: #E8F0EC1A;
+  --dsw-alias-border-l3: #E8F0EC24;
+  --dsw-alias-border-l4: #E8F0EC33;
+
+  --dsw-alias-label-primary: #E8EFEA;
+  --dsw-alias-label-primary-dimmed: #D2DBD5;
+  --dsw-alias-label-secondary: #A3ADA6;
+  --dsw-alias-label-tertiary: #7E8880;
+  --dsw-alias-label-caption: #66706A;
+
+  --dsw-alias-brand-primary: #5FB3B0;
+  --dsw-alias-brand-text: #5FB3B0;
+  --dsw-alias-brand-primary-new-colorprimary-new-color: #5FB3B0;
+}
