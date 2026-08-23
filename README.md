@@ -1,11 +1,35 @@
 # Deepharn
 
-Un escritorio propio para [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness),
-en macOS, para trabajar con el agente en todo lo que no es programar.
+**Una app de escritorio para [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
+en macOS, pensada para todo lo que no es programar:** escribir, investigar,
+orquestar tareas y quedarte con lo que producen.
+
+![macOS 14+](https://img.shields.io/badge/macOS-14%2B-0b2e30)
+![Swift 6](https://img.shields.io/badge/Swift-6-f05138)
+![Sin dependencias](https://img.shields.io/badge/frontend-sin%20dependencias-145F63)
+![MIT](https://img.shields.io/badge/licencia-MIT-1f7a5c)
 
 No es un tema ni un envoltorio de la interfaz oficial: es un **frontend distinto**
 que habla con el harness por su API, servido desde el propio harness y metido en
 una ventana nativa.
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  Espacio de trabajo            modelo ▾   esfuerzo ▾   ⤢     │
+├───────────────┬───────────────────────────┬──────────────────┤
+│ En marcha  2  │                           │ SALA DE CONTROL  │
+│  · Informe    │   Conversación            │  · Informe  62%  │
+│  · Resumen    │                           │  · Resumen  18%  │
+│               │   ¿En qué te ayudo?       ├──────────────────┤
+│ Hoy        3  │                           │ ENTREGABLES      │
+│  · Notas      │                           │  informe.md      │
+│  · Borrador   │                           │  tabla.csv       │
+│               │  ┌─────────────────────┐  │ EN USO           │
+│ Skills        │  │ Escribe y pulsa ⏎   │  │ skills · agentes │
+│ Ajustes       │  └─────────────────────┘  │ plugins          │
+└───────────────┴───────────────────────────┴──────────────────┘
+       plegable            siempre                plegable
+```
 
 ## Qué hace
 
@@ -42,21 +66,40 @@ funciona; desde dentro, las llamadas a `/api` salen gratis.
 
 ## Instalar
 
-Necesitas macOS 14+, Node 22+, pnpm y las Command Line Tools de Xcode.
+**Lo que necesitas:** macOS 14+ (Apple Silicon), Node 22+, pnpm, las Command Line
+Tools de Xcode y el harness (`npm i -g @deepseek-ai/dsh`). Si te falta algo, el
+instalador te lo dice antes de tocar nada.
 
 ```bash
-# 1. El harness, si no lo tienes
-npm i -g @deepseek-ai/dsh
+git clone https://github.com/AxelGoal/Deepharn.git
+cd Deepharn
+./instalar.sh
+```
 
-# 2. Un perfil propio, para no tocar el que ya uses
+Eso crea un perfil propio llamado `deepharn` —**no toca el que ya uses**—, instala
+los dos plugins, los monta en el árbol y compila la app en `/Applications`.
+
+Luego, desde Launchpad, o:
+
+```bash
+open -a Deepharn
+```
+
+<details>
+<summary>Hacerlo a mano, paso a paso</summary>
+
+```bash
+# Un perfil propio, copiado del que ya tienes
 cp -R ~/.dsh/profiles/web ~/.dsh/profiles/deepharn
 
-# 3. Los plugins de este repo
+# Los plugins
 dsh plugin --profile deepharn add ./plugins/deepharn-front
 dsh plugin --profile deepharn add ./plugins/deepharn-piel
 ```
 
-Y sus filas en `~/.dsh/profiles/deepharn/cordis.patch.yml`:
+Y sus filas en `~/.dsh/profiles/deepharn/cordis.patch.yml`. **Ojo con el
+envoltorio `insert`**: una entrada suelta con `id:` sobrescribe una fila existente
+en vez de añadir una nueva.
 
 ```yaml
 - insert:
@@ -67,14 +110,20 @@ Y sus filas en `~/.dsh/profiles/deepharn/cordis.patch.yml`:
       name: deepharn-piel
 ```
 
-Luego la app:
+Luego la app: `cd app && ./construir.sh`
+
+También vale sin app: `dsh --profile deepharn` y abrir
+`http://127.0.0.1:3081/deepharn/` en el navegador.
+</details>
+
+### Desinstalar
 
 ```bash
-cd app && ./construir.sh
+rm -rf ~/.dsh/profiles/deepharn /Applications/Deepharn.app
 ```
 
-Se compila, se instala en `/Applications` y se abre desde Launchpad. También vale
-sin app: `dsh --profile deepharn` y abrir `http://127.0.0.1:3081/deepharn/`.
+Nada más. El perfil que ya usabas queda intacto, y tus conversaciones también:
+viven en `~/.dsh/sessions`, fuera del perfil.
 
 ## Cómo arranca
 
@@ -93,6 +142,18 @@ Abrir la app es lo único que hay que hacer:
 
 Está en [COMO-ESTA-HECHO.md](COMO-ESTA-HECHO.md): la API del harness, sus métodos
 y sus trampas. Si vas a construir algo parecido, ahí tienes el mapa.
+
+## Trastear
+
+El frontend está en `plugins/deepharn-front/web/`: tres archivos, sin compilación.
+Se edita y se recarga con ⌘R. Si tocas la mitad de servidor (`lib/`), reinicia el
+harness con ⇧⌘R.
+
+La piel —colores y tipografías— está en `plugins/deepharn-piel/src/piel.css`; tras
+editarla, `node construir.mjs` la reensambla.
+
+Si algo no aparece: el harness compone su árbol **al arrancar**, así que los
+plugins y las skills nuevas piden reinicio.
 
 ## Estado
 
