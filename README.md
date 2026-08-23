@@ -1,2 +1,2 @@
 # Deepharn
-Deelseek harness app for mac
+Deepseek harness app for mac
