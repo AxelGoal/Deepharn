@@ -981,8 +981,32 @@ async function abrirModelos() {
     }),
   ])
 
-  menuModelos.replaceChildren(filtro, contenedor, pie)
+  // Elegir un modelo aquí no afecta solo a esta conversación: el harness lo
+  // guarda además como el de las nuevas. Conviene decirlo, porque explica que
+  // un gratuito elegido de paso se convierta en el de todos los días.
+  const defecto = await modeloPorDefecto()
+  const filaDefecto = el('div', { class: 'pie-modelos defecto' }, [
+    el('span', {
+      class: 'peq',
+      text: defecto
+        ? `El que elijas queda también para las conversaciones nuevas · ahora: ${defecto.model}`
+        : 'El que elijas queda también para las conversaciones nuevas',
+    }),
+  ])
+
+  menuModelos.replaceChildren(filtro, contenedor, pie, filaDefecto)
   filtro.focus()
+}
+
+// El modelo por defecto vive en los ajustes, no en la sesión: es el que
+// heredan las conversaciones nuevas. Sin esto había que editar el archivo a
+// mano, que es justo lo que el agente intentaba hacer una y otra vez.
+async function modeloPorDefecto() {
+  try {
+    const d = await rpc('settings.describe')
+    const ns = (d.namespaces ?? []).find((n) => n.ns === 'agent-default-model')
+    return ns?.value ?? null
+  } catch { return null }
 }
 
 // Trae el catálogo real y lo declara en los ajustes del proveedor. Declarar la

@@ -464,3 +464,7 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
   padding-top: 8px; border-top: 1px solid var(--linea2);
 }
 .pie-modelos .boton { font-size: 12px; padding: 5px 10px; }
+
+.pie-modelos.defecto { border-top: 0; padding-top: 4px; }
+.pie-modelos.defecto .peq { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.marca-defecto { color: var(--marca); font-weight: 600; }
