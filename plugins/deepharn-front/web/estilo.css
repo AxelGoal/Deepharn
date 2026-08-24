@@ -477,3 +477,13 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 
 .formulario { display: flex; flex-direction: column; gap: 8px; }
 .formulario select.filtro-modelo { appearance: auto; padding: 0 8px; }
+
+
+.ficha-agente {
+  display: flex; align-items: flex-start; gap: 12px; padding: 11px 0;
+  border-bottom: 1px solid var(--linea2);
+}
+.ficha-agente:last-of-type { border-bottom: 0; }
+.ficha-agente .datos-proyecto .peq { line-height: 1.45; margin-top: 3px; }
+.acciones-agente { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; flex: none; max-width: 46%; }
+.acciones-agente .boton { font-size: 12px; padding: 5px 9px; }

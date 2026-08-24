@@ -1008,6 +1008,135 @@ async function bloqueProyectos() {
 }
 
 
+
+
+// Los cuatro presets de fábrica vienen con nombre y descripción en chino en
+// esta versión del harness, y el ajuste de idioma no los cambia. Se traducen
+// aquí; los tuyos conservan lo que hayas escrito.
+const AGENTES_DE_FABRICA = {
+  standard: {
+    nombre: 'Estándar',
+    descripcion: 'Agente completo: edita archivos, usa la shell, busca en disco y en la web, y maneja skills, planes, objetivos, subagentes y flujos de trabajo.',
+  },
+  code: {
+    nombre: 'Programación (PTC)',
+    descripcion: 'Todo lo del estándar, pero las herramientas se le presentan como código: el modelo compone varios pasos en un solo programa TypeScript.',
+  },
+  minimal: {
+    nombre: 'Mínimo',
+    descripcion: 'Dos herramientas y nada más: una shell persistente y un editor de texto. Rápido y sin distracciones.',
+  },
+  cordis: {
+    nombre: 'Creación de agentes',
+    descripcion: 'Pensado para crear agentes nuevos: todo lo del estándar más inspección en marcha, pruebas de plugins y guía para escribir presets.',
+  },
+}
+
+// ── agentes ──────────────────────────────────────────────────────────────
+//
+// Un «agente» aquí es un preset: una composición que decide con qué
+// herramientas y con qué personalidad arranca la conversación. Los cuatro que
+// trae el harness son de sistema y no se tocan; los tuyos salen de duplicar uno
+// y editar el archivo. La API es de solo copia: no acepta contenido, así que
+// editar es abrir el documento en tu editor.
+
+async function abrirAgentes() {
+  const cuerpo = $('ajustes-cuerpo')
+  $('ajustes-titulo').textContent = 'Agentes'
+  cuerpo.replaceChildren(el('div', { class: 'nada', text: 'Cargando…' }))
+  velo.classList.remove('oculto')
+
+  let presets = []
+  let actual = null
+  try {
+    presets = (await rpc('agentPreset.list')).presets ?? []
+    const sesion = estado.sesiones.find((s) => s.sessionId === estado.actual)
+    actual = sesion?.agentPreset ?? null
+  } catch (error) {
+    cuerpo.replaceChildren(el('div', { class: 'nada', text: 'No he podido leerlos: ' + error.message }))
+    return
+  }
+
+  const piezas = []
+
+  for (const p of presets) {
+    const propio = p.trust !== 'system'
+    const enUso = p.id === actual
+
+    const acciones = el('div', { class: 'acciones-agente' }, [
+      enUso
+        ? el('span', { class: 'peq marca-defecto', text: 'en esta conversación' })
+        : el('button', {
+            class: 'boton',
+            text: 'Usar aquí',
+            onclick: async () => {
+              try {
+                await rpc('agentPreset.select', { sessionId: estado.actual, agentPreset: p.id })
+                await refrescar()
+                abrirAgentes()
+              } catch (error) { avisar(error.message) }
+            },
+          }),
+      el('button', {
+        class: 'boton',
+        text: 'Duplicar',
+        onclick: async () => {
+          const nombre = await preguntar({
+            titulo: 'Duplicar agente',
+            texto: `Se crea una copia de «${p.name ?? p.id}» que puedes editar a tu gusto.`,
+            confirmar: 'Crear', valor: `${p.id}-mio`,
+          })
+          if (!nombre) return
+          try {
+            await rpc('agentPreset.copy', { from: p.id, agentPreset: nombre })
+            abrirAgentes()
+          } catch (error) { avisar(error.message) }
+        },
+      }),
+    ])
+
+    if (propio) {
+      acciones.append(el('button', {
+        class: 'boton',
+        text: 'Editar',
+        onclick: async () => {
+          try { await rpc('agentPreset.openDocument', { agentPreset: p.id }) }
+          catch (error) { avisar(error.message) }
+        },
+      }))
+      acciones.append(el('button', {
+        class: 'boton peligro',
+        text: 'Borrar',
+        onclick: async () => {
+          const vale = await preguntar({
+            titulo: 'Borrar agente', texto: `«${p.id}» desaparece. No hay deshacer.`,
+            confirmar: 'Borrar', peligro: true,
+          })
+          if (!vale) return
+          try { await rpc('agentPreset.remove', { agentPreset: p.id }); abrirAgentes() }
+          catch (error) { avisar(error.message) }
+        },
+      }))
+    }
+
+    const traducido = AGENTES_DE_FABRICA[p.id]
+    const titulo = traducido?.nombre ?? p.name ?? p.id
+    const descripcion = traducido?.descripcion ?? p.description
+
+    piezas.push(el('div', { class: 'ficha-agente' }, [
+      el('div', { class: 'datos-proyecto' }, [
+        el('strong', { text: titulo }),
+        el('small', { class: 'mono', text: `${p.id} · ${propio ? 'tuyo' : 'de fábrica'}` }),
+        descripcion ? el('div', { class: 'peq', text: String(descripcion).slice(0, 200) }) : null,
+      ]),
+      acciones,
+    ]))
+  }
+
+  piezas.push(el('div', { class: 'peq', text: 'Los de fábrica no se pueden editar: duplica uno y cambia la copia. El agente elegido solo afecta a esta conversación; las nuevas nacen con el de por defecto.' }))
+  cuerpo.replaceChildren(...piezas)
+}
+
 // ── conexiones ───────────────────────────────────────────────────────────
 //
 // Los servidores MCP se declaran como filas del árbol y sus tokens viven en el
@@ -1536,6 +1665,7 @@ document.addEventListener('keydown', (e) => { if (e.key === 'Escape') velo.class
 $('abrir-oficial').addEventListener('click', () => { location.href = '/' })
 $('ir-conexiones').addEventListener('click', abrirConexiones)
 $('ir-skills').addEventListener('click', abrirAjustes)
+$('ir-agentes').addEventListener('click', abrirAgentes)
 
 // ── plegado ──────────────────────────────────────────────────────────────
 
