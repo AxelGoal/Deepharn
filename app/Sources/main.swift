@@ -58,7 +58,7 @@ func colaDelRegistro(_ lineas: Int = 6) -> String {
 
 // ── Aplicación ───────────────────────────────────────────────────────────────
 
-final class Deepharn: NSObject, NSApplicationDelegate, WKNavigationDelegate {
+final class Deepharn: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScriptMessageHandler {
 
     var ventana: NSWindow!
     var web: WKWebView!
@@ -111,9 +111,14 @@ final class Deepharn: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         let p = Process()
         p.executableURL = URL(fileURLWithPath: ejecutable)
         p.arguments = previos + ["--profile", perfil, "--port", String(puertoActivo), "--no-open"]
-        // Una app abierta desde el Finder arranca en «/», y el harness heredaría
-        // ese directorio como espacio de trabajo.
-        p.currentDirectoryURL = FileManager.default.homeDirectoryForCurrentUser
+        // El directorio de trabajo se convierte en el espacio del agente, y con
+        // la política «workspace-write» eso es lo que puede tocar sin pedir
+        // permiso. Una app abierta desde el Finder arranca en «/», y la carpeta
+        // personal entera es demasiado: se le da una suya.
+        let casa = FileManager.default.homeDirectoryForCurrentUser
+        let espacio = casa.appendingPathComponent("Deepharn")
+        try? FileManager.default.createDirectory(at: espacio, withIntermediateDirectories: true)
+        p.currentDirectoryURL = FileManager.default.fileExists(atPath: espacio.path) ? espacio : casa
 
         var entorno = ProcessInfo.processInfo.environment
         entorno["PATH"] = (entorno["PATH"] ?? "") + ":/opt/homebrew/bin:/usr/local/bin:/usr/bin"
@@ -181,7 +186,12 @@ final class Deepharn: NSObject, NSApplicationDelegate, WKNavigationDelegate {
         ventana.setFrameAutosaveName("VentanaPrincipal")
         ventana.center()
 
-        web = WKWebView(frame: .zero, configuration: WKWebViewConfiguration())
+        // Puente con la página: así puede pedirnos que enseñemos un diálogo
+        // nativo cuando el agente pide permiso.
+        let configuracion = WKWebViewConfiguration()
+        configuracion.userContentController.add(self, name: "deepharn")
+
+        web = WKWebView(frame: .zero, configuration: configuracion)
         web.navigationDelegate = self
         web.autoresizingMask = [.width, .height]
         web.isHidden = true
@@ -251,6 +261,48 @@ final class Deepharn: NSObject, NSApplicationDelegate, WKNavigationDelegate {
     }
 
     @objc func volverAIntentar() { arrancar() }
+
+    // ── Permisos ─────────────────────────────────────────────────────────────
+
+    func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
+        guard message.name == "deepharn",
+              let datos = message.body as? [String: Any],
+              datos["tipo"] as? String == "permiso",
+              let id = datos["id"] as? String else { return }
+
+        let herramienta = datos["herramienta"] as? String ?? "una herramienta"
+        let motivo = datos["motivo"] as? String ?? "Sin motivo declarado."
+        preguntarPermiso(id: id, herramienta: herramienta, motivo: motivo)
+    }
+
+    /// Trae la app al frente y planta el diálogo. Si estás en otra cosa, el
+    /// icono del Dock rebota hasta que atiendes.
+    func preguntarPermiso(id: String, herramienta: String, motivo: String) {
+        if !NSApp.isActive {
+            NSApp.requestUserAttention(.criticalRequest)
+            NSApp.activate(ignoringOtherApps: true)
+        }
+
+        let alerta = NSAlert()
+        alerta.messageText = "El agente pide permiso para usar \(herramienta)"
+        alerta.informativeText = motivo
+        alerta.alertStyle = .warning
+        alerta.addButton(withTitle: "Permitir una vez")
+        alerta.addButton(withTitle: "Rechazar")
+
+        let responder: (String) -> Void = { [weak self] decision in
+            let escapado = id.replacingOccurrences(of: "'", with: "")
+            self?.web.evaluateJavaScript("window.__responderPermiso && window.__responderPermiso('\(escapado)','\(decision)')")
+        }
+
+        if let ventana = ventana, ventana.isVisible {
+            alerta.beginSheetModal(for: ventana) { respuesta in
+                responder(respuesta == .alertFirstButtonReturn ? "allowed-once" : "rejected")
+            }
+        } else {
+            responder(alerta.runModal() == .alertFirstButtonReturn ? "allowed-once" : "rejected")
+        }
+    }
 
     // ── Cierre ───────────────────────────────────────────────────────────────
 

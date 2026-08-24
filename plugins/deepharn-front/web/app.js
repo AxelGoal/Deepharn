@@ -532,6 +532,14 @@ function atenderPeticion(trama) {
   if (p.type === 'approval/requested') {
     aprobaciones.set(p.approvalId, { rpcId: trama.rpcId, payload: p })
     pintarAprobaciones()
+    // Dentro de la app de escritorio, además, que salte un diálogo del sistema:
+    // si estás en otra ventana no te enteras de una tarjeta en la página.
+    window.webkit?.messageHandlers?.deepharn?.postMessage({
+      tipo: 'permiso',
+      id: p.approvalId,
+      herramienta: p.toolName ?? 'una herramienta',
+      motivo: p.reason ?? 'Sin motivo declarado.',
+    })
     return
   }
   if (p.type === 'approval/resolved' || p.type === 'approval/cancelled') {
@@ -560,6 +568,9 @@ async function responderAprobacion(approvalId, outcome) {
     avisar(`No he podido responder al permiso: ${error.message}`)
   }
 }
+
+// La concha responde por aquí cuando eliges en el diálogo nativo.
+window.__responderPermiso = (id, decision) => responderAprobacion(id, decision)
 
 function pintarAprobaciones() {
   const zona = $('permisos')
