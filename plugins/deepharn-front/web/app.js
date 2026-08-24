@@ -351,6 +351,21 @@ function pintarHilo() {
       pintados++
     }
 
+    // Un turno que acaba en error: el harness lo cuenta y hasta ahora nos lo
+    // tragábamos, así que parecía que la app no hacía nada. Modelo caído,
+    // clave caducada o cuota agotada entran todos por aquí.
+    if (ev.type === 'turn/end' && ev.data?.reason?.kind === 'error') {
+      const mensaje = ev.data.reason.error?.message ?? 'El turno terminó con un error.'
+      interior.append(el('div', { class: 'msg' }, [
+        el('div', { class: 'error-turno' }, [
+          el('strong', { text: 'El modelo no ha podido responder' }),
+          el('div', { class: 'detalle-error', text: String(mensaje).slice(0, 400) }),
+          el('div', { class: 'pista-error', text: 'Si es un 404 o un problema de cuota, prueba con otro modelo desde la pastilla de arriba.' }),
+        ]),
+      ]))
+      pintados++
+    }
+
     if (ev.type === 'assistant/message') {
       const texto = textoDe(ev.data?.message?.content)
       if (!texto) continue
