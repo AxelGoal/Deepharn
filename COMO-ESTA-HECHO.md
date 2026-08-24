@@ -88,6 +88,39 @@ Lo que hace falta para pintar una conversación:
   deltas posteriores al último `assistant/message` se pinta lo que el modelo está
   escribiendo **sin tocar los WebSocket**.
 
+## Los WebSocket: eventos en vivo, permisos y preguntas
+
+Los dos sockets de bajada —`/api/events.mux` y `/api/events.host`— abren sin
+autenticación desde la propia página y mandan `server-request`. El `payload.type`
+dice de qué va cada trama:
+
+| `payload.type` | Qué trae | Se responde |
+|---|---|---|
+| `session/event` | el mismo evento que el historial, según ocurre | no |
+| `session/projection` | `{key, value}`, p. ej. `tokenUsage` en vivo | no |
+| `approval/requested` | `{sessionId, approvalId, toolName, reason}` | sí |
+| `question/requested` | `{sessionId, questions[]}` | sí |
+
+Responder es un `POST /api/respond` con el **mismo `rpcId`** de la trama:
+
+```json
+{ "type": "client-response", "rpcId": "…",
+  "result": { "ok": true, "value": { "sessionId": "…", "approvalId": "…", "outcome": "allowed-once" } } }
+```
+
+Para las preguntas, el valor es `{ sessionId, answer: { answers: [{ id, selected: [...] }] } }`.
+
+**Las dos que se responden son trampas mortales:** no hay método RPC para
+consultarlas, así que quien no escuche el socket deja el turno esperando para
+siempre, sin error y sin pista. Parece que la aplicación se ha colgado.
+
+Dentro de `assistant/chunk` los tipos útiles son `text-delta`, `reasoning-delta`
+—el razonamiento, si el modelo lo emite— y `usage`.
+
+El mapa de tramas lo sacamos leyendo
+[jetbrains-cc-gui](https://github.com/zhukunpenglinyutong/jetbrains-cc-gui),
+que ya lo tenía resuelto para su puente con JetBrains. Ahorró horas.
+
 ## Trampas que costaron tiempo
 
 **El frontend tiene que ir en el mismo origen que `/api`.** El cortafuegos compara

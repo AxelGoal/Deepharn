@@ -468,3 +468,8 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 .pie-modelos.defecto { border-top: 0; padding-top: 4px; }
 .pie-modelos.defecto .peq { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .marca-defecto { color: var(--marca); font-weight: 600; }
+
+
+.permiso.pregunta { background: var(--marca-suave); border-color: color-mix(in srgb, var(--marca) 40%, transparent); }
+.permiso.pregunta .permiso-punto { background: var(--marca); }
+.pregunta-bloque { display: flex; flex-direction: column; gap: 7px; }

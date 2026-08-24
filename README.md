@@ -38,8 +38,8 @@ derecha lo que está corriendo, lo que ha producido y lo que tiene a mano.*
 Y cuando algo falla —modelo retirado, clave caducada, cuota agotada— **se ve**:
 el error del proveedor sale en la conversación en vez de quedarse en nada.
 
-La respuesta del agente se pinta según se escribe, y el texto se renderiza como
-markdown: párrafos, viñetas, código.
+La respuesta llega **en vivo por WebSocket** y se pinta según se escribe, con el
+texto renderizado como markdown: párrafos, viñetas, código.
 
 ## Por dentro
 
@@ -190,9 +190,8 @@ plugins y las skills nuevas piden reinicio.
 Funciona y se usa a diario, pero es joven y el harness que hay debajo está en
 *developer preview*, así que rompe compatibilidad de vez en cuando.
 
-**Lo que falta:** que la respuesta se escriba letra a letra —los WebSocket ya
-están conectados para los permisos, falta usarlos también para el texto— y
-adjuntar archivos.
+**Lo que falta:** adjuntar archivos, y enseñar el razonamiento del modelo cuando
+lo emite (`reasoning-delta` ya llega por el socket, solo falta pintarlo).
 
 ## Licencia
 

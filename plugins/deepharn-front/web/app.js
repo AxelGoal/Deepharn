@@ -504,6 +504,7 @@ async function contarSkills() {
 // parece colgada. Esto es exactamente lo que pasaba antes.
 
 const aprobaciones = new Map()   // approvalId → { rpcId, payload }
+const preguntas = new Map()      // rpcId → payload de question/requested
 
 function conectarEventos() {
   for (const ruta of ['events.mux', 'events.host']) {
@@ -529,6 +530,30 @@ function conectarEventos() {
 
 function atenderPeticion(trama) {
   const p = trama.payload ?? {}
+
+  // Los eventos de la conversación llegan por aquí en tiempo real. Antes se
+  // sacaban sondeando el historial cada segundo y pico; esto es lo mismo pero
+  // según ocurre, sin repintar de más.
+  if (p.type === 'session/event') {
+    if (p.sessionId && p.sessionId !== estado.actual) return
+    const evento = p.event ?? p
+    if (!evento?.type) return
+    estado.historia ??= { events: [] }
+    estado.historia.events = [...(estado.historia.events ?? []), { event: evento }]
+    pintarHilo()
+    if (evento.type === 'turn/end' || evento.type === 'tool/result') {
+      pintarEntregables()
+      refrescar()
+    }
+    return
+  }
+
+  if (p.type === 'question/requested') {
+    preguntas.set(trama.rpcId, p)
+    pintarPreguntas()
+    return
+  }
+
   if (p.type === 'approval/requested') {
     aprobaciones.set(p.approvalId, { rpcId: trama.rpcId, payload: p })
     pintarAprobaciones()
@@ -571,6 +596,80 @@ async function responderAprobacion(approvalId, outcome) {
 
 // La concha responde por aquí cuando eliges en el diálogo nativo.
 window.__responderPermiso = (id, decision) => responderAprobacion(id, decision)
+
+// El agente también puede hacer preguntas con opciones. Van por el mismo canal
+// y, si nadie responde, el turno se queda esperando igual que con los permisos.
+async function responderPregunta(rpcId, respuestas) {
+  const entrada = preguntas.get(rpcId)
+  if (!entrada) return
+  preguntas.delete(rpcId)
+  pintarPreguntas()
+  try {
+    await fetch('/api/respond', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        type: 'client-response',
+        rpcId,
+        result: { ok: true, value: { sessionId: entrada.sessionId ?? estado.actual, answer: { answers: respuestas } } },
+      }),
+    })
+  } catch (error) {
+    avisar(`No he podido responder: ${error.message}`)
+  }
+}
+
+function pintarPreguntas() {
+  const zona = $('preguntas')
+  zona.replaceChildren()
+  zona.classList.toggle('oculto', preguntas.size === 0)
+
+  for (const [rpcId, p] of preguntas) {
+    const lista = Array.isArray(p.questions) ? p.questions : []
+    const elegidas = new Map()
+
+    const tarjeta = el('div', { class: 'permiso pregunta' }, [
+      el('div', { class: 'permiso-alto' }, [
+        el('span', { class: 'permiso-punto' }),
+        el('strong', { text: lista.length > 1 ? 'El agente te pregunta' : 'El agente te pregunta una cosa' }),
+      ]),
+    ])
+
+    lista.forEach((q, i) => {
+      const id = q.id ?? String(i)
+      const texto = q.question ?? q.header ?? q.text ?? 'Elige una opción'
+      const opciones = Array.isArray(q.options) ? q.options : []
+      const fila = el('div', { class: 'pregunta-bloque' }, [el('div', { class: 'permiso-motivo', text: texto })])
+      const botones = el('div', { class: 'fichas' })
+      for (const o of opciones) {
+        const etiqueta = typeof o === 'string' ? o : (o.label ?? o.value ?? String(o))
+        const boton = el('button', {
+          class: 'ficha accion',
+          title: typeof o === 'object' ? (o.description ?? '') : '',
+          text: etiqueta,
+          onclick: () => {
+            elegidas.set(id, [etiqueta])
+            for (const otro of botones.children) otro.classList.remove('propia')
+            boton.classList.add('propia')
+          },
+        })
+        botones.append(boton)
+      }
+      fila.append(botones)
+      tarjeta.append(fila)
+    })
+
+    tarjeta.append(el('div', { class: 'permiso-botones' }, [
+      el('button', {
+        class: 'boton',
+        text: 'Responder',
+        onclick: () => responderPregunta(rpcId, [...elegidas].map(([id, selected]) => ({ id, selected }))),
+      }),
+    ]))
+
+    zona.append(tarjeta)
+  }
+}
 
 function pintarAprobaciones() {
   const zona = $('permisos')
@@ -1362,4 +1461,4 @@ if (estado.sesiones.length) {
   await abrir(reciente.sessionId)
   await contarSkills()
 }
-setInterval(refrescar, 4000)
+setInterval(refrescar, 10000)   // los eventos llegan por WebSocket; esto es solo la red de seguridad
