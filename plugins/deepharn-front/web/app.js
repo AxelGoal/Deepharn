@@ -494,6 +494,96 @@ async function contarSkills() {
 }
 
 
+
+// ── permisos ─────────────────────────────────────────────────────────────
+//
+// El harness pide permiso por los WebSocket de bajada: manda un server-request
+// con method "approval/requested" y espera un client-response por POST /api/respond
+// con el mismo rpcId. No hay método RPC para preguntarle si hay alguno pendiente:
+// si no escuchas el socket, el turno se queda esperando para siempre y la app
+// parece colgada. Esto es exactamente lo que pasaba antes.
+
+const aprobaciones = new Map()   // approvalId → { rpcId, payload }
+
+function conectarEventos() {
+  for (const ruta of ['events.mux', 'events.host']) {
+    let ws
+    const abrir = () => {
+      try {
+        ws = new WebSocket(`ws://${location.host}/api/${ruta}`)
+      } catch { return setTimeout(abrir, 3000) }
+
+      ws.onmessage = (e) => {
+        let trama
+        try { trama = JSON.parse(e.data) } catch { return }
+        if (trama?.type !== 'server-request') return
+        atenderPeticion(trama)
+      }
+      // Si se cae, se reintenta: sin este canal no hay permisos.
+      ws.onclose = () => setTimeout(abrir, 3000)
+      ws.onerror = () => { try { ws.close() } catch {} }
+    }
+    abrir()
+  }
+}
+
+function atenderPeticion(trama) {
+  const p = trama.payload ?? {}
+  if (p.type === 'approval/requested') {
+    aprobaciones.set(p.approvalId, { rpcId: trama.rpcId, payload: p })
+    pintarAprobaciones()
+    return
+  }
+  if (p.type === 'approval/resolved' || p.type === 'approval/cancelled') {
+    aprobaciones.delete(p.approvalId)
+    pintarAprobaciones()
+  }
+}
+
+async function responderAprobacion(approvalId, outcome) {
+  const entrada = aprobaciones.get(approvalId)
+  if (!entrada) return
+  aprobaciones.delete(approvalId)
+  pintarAprobaciones()
+  try {
+    await fetch('/api/respond', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        type: 'client-response',
+        rpcId: entrada.rpcId,
+        result: { ok: true, value: { sessionId: entrada.payload.sessionId, approvalId, outcome } },
+      }),
+    })
+    seguirDeCerca()
+  } catch (error) {
+    avisar(`No he podido responder al permiso: ${error.message}`)
+  }
+}
+
+function pintarAprobaciones() {
+  const zona = $('permisos')
+  zona.replaceChildren()
+  const pendientes = [...aprobaciones.values()]
+  zona.classList.toggle('oculto', pendientes.length === 0)
+
+  for (const { payload: p } of pendientes) {
+    zona.append(el('div', { class: 'permiso' }, [
+      el('div', { class: 'permiso-alto' }, [
+        el('span', { class: 'permiso-punto' }),
+        el('strong', { text: `El agente pide permiso para usar ${p.toolName ?? 'una herramienta'}` }),
+      ]),
+      el('div', { class: 'permiso-motivo', text: p.reason ?? 'Sin motivo declarado.' }),
+      el('div', { class: 'permiso-botones' }, [
+        el('button', { class: 'boton', text: 'Rechazar', onclick: () => responderAprobacion(p.approvalId, 'rejected') }),
+        el('button', { class: 'boton principal', text: 'Permitir una vez', onclick: () => responderAprobacion(p.approvalId, 'allowed-once') }),
+      ]),
+    ]))
+  }
+}
+
+conectarEventos()
+
 // ── escribir ─────────────────────────────────────────────────────────────
 //
 // session.prompt admite dos modos: "queue" encola el mensaje para el próximo

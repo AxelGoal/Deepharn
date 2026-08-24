@@ -439,3 +439,22 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
   line-height: 1.45; color: var(--texto2); word-break: break-word;
 }
 .pista-error { font-size: 12px; color: var(--texto3); }
+
+
+/* ── peticiones de permiso ─────────────────────────────────────────────── */
+
+.permisos { flex: none; padding: 0 22px 12px; display: flex; flex-direction: column; gap: 10px; }
+.permisos.oculto { display: none; }
+
+.permiso {
+  max-width: 880px; margin: 0 auto; width: 100%;
+  background: var(--ambar-suave); border: 1px solid color-mix(in srgb, var(--ambar) 45%, transparent);
+  border-radius: 12px; padding: 13px 15px; display: flex; flex-direction: column; gap: 9px;
+}
+.permiso-alto { display: flex; align-items: center; gap: 9px; }
+.permiso-punto { width: 8px; height: 8px; border-radius: 50%; background: var(--ambar); flex: none; }
+.permiso-alto strong { font-size: 14px; color: var(--tinta); }
+.permiso-motivo { font-size: 13px; line-height: 1.5; color: var(--texto2); }
+.permiso-botones { display: flex; gap: 8px; justify-content: flex-end; }
+.boton.principal { background: var(--ambar); border-color: var(--ambar); color: #fff; font-weight: 600; }
+.boton.principal:hover { filter: brightness(1.08); }
