@@ -95,8 +95,14 @@ function pintarBarra() {
   $('marcha-texto').textContent = enMarcha === 1 ? '1 tarea en curso' : `${enMarcha} tareas en curso`
 }
 
-function pintarLista() {
+let firmaLista = null
+
+function pintarLista(forzar = false) {
   const filtro = $('buscar').value.trim().toLowerCase()
+  const firma = filtro + '|' + estado.actual + '|' + estado.sesiones
+    .map((s) => `${s.sessionId}:${s.updatedAt}:${s.running ? 1 : 0}`).join(',')
+  if (!forzar && firma === firmaLista) return
+  firmaLista = firma
   const grupos = { marcha: [], hoy: [], antes: [] }
   const inicio = HOY()
 
@@ -150,7 +156,14 @@ function pintarLista() {
   else lista.append(...partes)
 }
 
+let firmaControl = null
+
 function pintarControl() {
+  const vivasFirma = estado.sesiones.filter((s) => s.running && !estado.archivadas.has(s.sessionId))
+    .map((s) => `${s.sessionId}:${s.updatedAt}`).join(',')
+  if (vivasFirma === firmaControl) return
+  firmaControl = vivasFirma
+
   const cuerpo = $('control')
   cuerpo.replaceChildren()
 
@@ -315,7 +328,22 @@ function textoDe(contenido) {
     .trim()
 }
 
-function pintarHilo() {
+// Repintar cuesta poco, pero hacerlo cada segundo tira el hover, la selección
+// de texto y la posición. Con una firma barata del contenido, si no ha cambiado
+// nada no se toca el DOM.
+function firmaHistoria() {
+  const ev = estado.historia?.events ?? []
+  const ultimo = ev[ev.length - 1]?.event
+  return `${estado.actual}|${ev.length}|${ultimo?.seq ?? ''}|${ultimo?.type ?? ''}`
+}
+
+let firmaPintada = null
+
+function pintarHilo(forzar = false) {
+  const firma = firmaHistoria()
+  if (!forzar && firma === firmaPintada) return
+  firmaPintada = firma
+
   const hilo = $('hilo')
   hilo.replaceChildren()
 
@@ -404,8 +432,13 @@ function pintarHilo() {
   }
 
   if (!pintados) interior.append(el('div', { class: 'vacio', text: 'Conversación vacía.' }))
+
+  // Si estabas leyendo más arriba, no te bajo a la fuerza. Solo sigo el hilo
+  // cuando ya estabas al final, que es cuando quieres ver lo que va llegando.
+  const alFinal = hilo.scrollHeight - hilo.scrollTop - hilo.clientHeight < 120
+  const posicion = hilo.scrollTop
   hilo.append(interior)
-  hilo.scrollTop = hilo.scrollHeight
+  hilo.scrollTop = alFinal ? hilo.scrollHeight : posicion
 
   const sesion = estado.sesiones.find((s) => s.sessionId === estado.actual)
   $('conv-titulo').textContent = sesion ? tituloDe(sesion) : 'Conversación'
@@ -418,14 +451,14 @@ function pintarHilo() {
 
 async function abrir(sessionId) {
   estado.actual = sessionId
-  pintarLista()
+  pintarLista(true)
   try {
     estado.historia = await rpc('session.history', { sessionId })
   } catch (error) {
     estado.historia = null
     console.warn(error)
   }
-  pintarHilo()
+  pintarHilo(true)
   pintarEntregables()
   pintarEnUso().catch((e) => console.warn(e))
 }
@@ -1151,7 +1184,7 @@ $('solo-chat').addEventListener('click', () => {
 for (const cab of document.querySelectorAll('.panel-cabecera')) {
   cab.addEventListener('click', () => cab.closest('.panel').classList.toggle('plegado'))
 }
-$('buscar').addEventListener('input', pintarLista)
+$('buscar').addEventListener('input', () => pintarLista(true))
 $('plegar-izq').classList.add('activo')
 $('plegar-der').classList.add('activo')
 
