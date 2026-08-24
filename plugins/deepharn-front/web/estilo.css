@@ -473,3 +473,7 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 .permiso.pregunta { background: var(--marca-suave); border-color: color-mix(in srgb, var(--marca) 40%, transparent); }
 .permiso.pregunta .permiso-punto { background: var(--marca); }
 .pregunta-bloque { display: flex; flex-direction: column; gap: 7px; }
+
+
+.formulario { display: flex; flex-direction: column; gap: 8px; }
+.formulario select.filtro-modelo { appearance: auto; padding: 0 8px; }

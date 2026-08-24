@@ -267,8 +267,16 @@ final class Deepharn: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
     func userContentController(_ controller: WKUserContentController, didReceive message: WKScriptMessage) {
         guard message.name == "deepharn",
               let datos = message.body as? [String: Any],
-              datos["tipo"] as? String == "permiso",
-              let id = datos["id"] as? String else { return }
+              let tipo = datos["tipo"] as? String else { return }
+
+        // La pantalla de conexiones pide reiniciar: los servidores MCP se
+        // conectan al arrancar, así que sin esto no aparecen.
+        if tipo == "reiniciar" {
+            reiniciarHarness()
+            return
+        }
+
+        guard tipo == "permiso", let id = datos["id"] as? String else { return }
 
         let herramienta = datos["herramienta"] as? String ?? "una herramienta"
         let motivo = datos["motivo"] as? String ?? "Sin motivo declarado."

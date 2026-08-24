@@ -1007,6 +1007,115 @@ async function bloqueProyectos() {
   return caja
 }
 
+
+// ── conexiones ───────────────────────────────────────────────────────────
+//
+// Los servidores MCP se declaran como filas del árbol y sus tokens viven en el
+// entorno. Esto lo hace por ti: escribe la fila, guarda el token aparte y
+// reinicia el harness, que es lo que hace falta para que se conecten.
+
+async function abrirConexiones() {
+  const cuerpo = $('ajustes-cuerpo')
+  $('ajustes-titulo').textContent = 'Conexiones'
+  cuerpo.replaceChildren(el('div', { class: 'nada', text: 'Cargando…' }))
+  velo.classList.remove('oculto')
+
+  let datos
+  try {
+    datos = await nuestraApi('conexiones')
+  } catch (error) {
+    cuerpo.replaceChildren(el('div', { class: 'nada', text: 'No he podido leerlas: ' + error.message }))
+    return
+  }
+
+  const piezas = []
+
+  const lista = el('div', { class: 'grupo-ajuste' }, [el('h5', { text: `Conectadas · ${datos.conexiones.length}` })])
+  if (!datos.conexiones.length) {
+    lista.append(el('div', { class: 'nada', text: 'Todavía no hay ninguna. Añade una abajo.' }))
+  } else {
+    for (const c of datos.conexiones) {
+      lista.append(el('div', { class: 'fila-proyecto' }, [
+        el('div', { class: 'datos-proyecto' }, [
+          el('strong', { text: c.nombre }),
+          el('small', { class: 'mono', text: `${c.transporte} · ${c.destino}${c.variable ? ' · token en .env' : ''}` }),
+        ]),
+        el('button', {
+          class: 'boton peligro',
+          text: 'Quitar',
+          onclick: async () => {
+            const vale = await preguntar({
+              titulo: 'Quitar conexión',
+              texto: `«${c.nombre}» dejará de estar disponible para el agente. El token, si lo hay, se queda guardado.`,
+              confirmar: 'Quitar', peligro: true,
+            })
+            if (!vale) return
+            try {
+              await nuestraApi('conexiones/quitar', {
+                method: 'POST', headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ nombre: c.nombre }),
+              })
+              abrirConexiones()
+            } catch (error) { avisar(error.message) }
+          },
+        }),
+      ]))
+    }
+  }
+  piezas.push(lista)
+
+  // Formulario
+  const nombre = el('input', { class: 'filtro-modelo', type: 'text', placeholder: 'nombre corto, p. ej. n8n' })
+  const tipo = el('select', { class: 'filtro-modelo' })
+  tipo.append(el('option', { value: 'stdio', text: 'Programa local (stdio)' }))
+  tipo.append(el('option', { value: 'http', text: 'Dirección web (http)' }))
+  const destino = el('input', { class: 'filtro-modelo', type: 'text', placeholder: 'npx -y el-paquete-del-servidor' })
+  const token = el('input', { class: 'filtro-modelo', type: 'password', placeholder: 'token, si lo necesita (opcional)' })
+  const estado_ = el('div', { class: 'peq' })
+
+  tipo.addEventListener('change', () => {
+    destino.placeholder = tipo.value === 'stdio' ? 'npx -y el-paquete-del-servidor' : 'https://tu-servidor/mcp'
+  })
+
+  const guardar = el('button', { class: 'boton principal', text: 'Añadir' })
+  guardar.addEventListener('click', async () => {
+    guardar.disabled = true
+    estado_.textContent = 'Guardando…'
+    try {
+      await nuestraApi('conexiones', {
+        method: 'POST', headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ nombre: nombre.value, transporte: tipo.value, destino: destino.value, token: token.value }),
+      })
+      nombre.value = ''; destino.value = ''; token.value = ''
+      estado_.textContent = 'Añadida. Hay que reiniciar el harness para que se conecte.'
+      setTimeout(abrirConexiones, 1500)
+    } catch (error) {
+      estado_.textContent = error.message
+    } finally { guardar.disabled = false }
+  })
+
+  piezas.push(el('div', { class: 'grupo-ajuste' }, [
+    el('h5', { text: 'Añadir una' }),
+    el('div', { class: 'formulario' }, [nombre, tipo, destino, token, guardar]),
+    estado_,
+    el('div', { class: 'peq', text: 'El token se guarda en ' + datos.archivoEnv + ', nunca en la configuración.' }),
+    el('div', { class: 'peq', text: 'Si el servidor pide entrar con el navegador, autorízalo antes en un terminal: aquí no hay dónde enseñarte el enlace.' }),
+  ]))
+
+  piezas.push(el('div', { class: 'grupo-ajuste' }, [
+    el('button', {
+      class: 'boton',
+      text: 'Reiniciar el harness ahora',
+      onclick: () => {
+        window.webkit?.messageHandlers?.deepharn?.postMessage({ tipo: 'reiniciar' })
+        avisar('Reiniciando. Si no ocurre nada, usa ⇧⌘R desde el menú Vista.')
+      },
+    }),
+  ]))
+
+  cuerpo.replaceChildren(...piezas)
+}
+
 // ── modelo ───────────────────────────────────────────────────────────────
 //
 // session.models devuelve { current:{provider,model}, groups:[{id,name,models}] }
@@ -1267,6 +1376,7 @@ function dato(clave, valor) {
 
 async function abrirAjustes() {
   const cuerpo = $('ajustes-cuerpo')
+  $('ajustes-titulo').textContent = 'Ajustes'
   cuerpo.replaceChildren(el('div', { class: 'nada', text: 'Cargando…' }))
   velo.classList.remove('oculto')
 
@@ -1424,7 +1534,7 @@ $('cerrar-ajustes').addEventListener('click', () => velo.classList.add('oculto')
 velo.addEventListener('click', (e) => { if (e.target === velo) velo.classList.add('oculto') })
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape') velo.classList.add('oculto') })
 $('abrir-oficial').addEventListener('click', () => { location.href = '/' })
-$('ir-conexiones').addEventListener('click', abrirAjustes)
+$('ir-conexiones').addEventListener('click', abrirConexiones)
 $('ir-skills').addEventListener('click', abrirAjustes)
 
 // ── plegado ──────────────────────────────────────────────────────────────

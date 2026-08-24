@@ -184,6 +184,110 @@ async function modelosDeOpenrouter() {
   return lista
 }
 
+
+// ── conexiones (servidores MCP) ──────────────────────────────────────────
+//
+// El harness los declara como filas del árbol y los secretos se leen del
+// entorno. Aquí se escribe una cosa en cada sitio: la fila en el parche del
+// perfil, y el token en ~/.dsh/.env, que nunca entra en el YAML.
+
+const ENV = join(CASA, '.dsh', '.env')
+const MARCA = '# conexiones de deepharn'
+
+async function leerTexto(ruta) {
+  try { return await readFile(ruta, 'utf8') } catch { return '' }
+}
+
+/** Lee las filas de MCP del parche. Solo entiende las que escribe esta app. */
+async function listarConexiones() {
+  const parche = await leerTexto(PARCHE)
+  const conexiones = []
+  const bloques = parche.split(/\n(?=- insert:)/)
+  for (const b of bloques) {
+    if (!b.includes('dsh-mcp-client')) continue
+    if (b.trimStart().startsWith('#')) continue
+    const nombre = /serverName:\s*(\S+)/.exec(b)?.[1]
+    if (!nombre) continue
+    conexiones.push({
+      nombre,
+      transporte: /transport:\s*(\S+)/.exec(b)?.[1] ?? '?',
+      destino: /url:\s*(\S+)/.exec(b)?.[1] ?? /command:\s*(\S+)/.exec(b)?.[1] ?? '',
+      variable: /process\.env\.(\w+)/.exec(b)?.[1] ?? null,
+    })
+  }
+  const env = await leerTexto(ENV)
+  const variables = [...env.matchAll(/^(\w+)=/gm)].map((m) => m[1])
+  return { conexiones, variables, archivoEnv: ENV }
+}
+
+async function anadirConexion(datos) {
+  const nombre = String(datos.nombre ?? '').trim()
+  if (!/^[A-Za-z0-9_-]{1,32}$/.test(nombre)) throw new Error('El nombre solo admite letras, números, guion y guion bajo')
+
+  const { conexiones } = await listarConexiones()
+  if (conexiones.some((c) => c.nombre === nombre)) throw new Error(`Ya hay una conexión llamada ${nombre}`)
+
+  const transporte = datos.transporte === 'http' ? 'streamable-http' : 'stdio'
+  const destino = String(datos.destino ?? '').trim()
+  if (!destino) throw new Error(transporte === 'stdio' ? 'Falta el comando' : 'Falta la dirección')
+
+  // El token, si lo hay, va al .env con un nombre derivado del servidor.
+  let variable = null
+  const token = String(datos.token ?? '').trim()
+  if (token) {
+    variable = `${nombre.toUpperCase().replace(/-/g, '_')}_TOKEN`
+    const env = await leerTexto(ENV)
+    const limpio = env.split('\n').filter((l) => !l.startsWith(`${variable}=`)).join('\n').trim()
+    await writeFile(ENV, `${limpio ? limpio + '\n' : ''}${variable}=${token}\n`, { mode: 0o600 })
+  }
+
+  let fila
+  if (transporte === 'stdio') {
+    const partes = destino.split(/\s+/)
+    const comando = partes[0]
+    const argumentos = partes.slice(1)
+    fila = `- insert:
+    - id: mcp-${nombre}
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: ${nombre}
+        transport: stdio
+        command: ${comando}
+        args: [${argumentos.map((a) => JSON.stringify(a)).join(', ')}]
+        failOnStartupError: false${variable ? `
+        env:
+          TOKEN: !!js process.env.${variable}` : ''}
+`
+  } else {
+    fila = `- insert:
+    - id: mcp-${nombre}
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: ${nombre}
+        transport: streamable-http
+        url: ${destino}
+        failOnStartupError: false${variable ? `
+        headers:
+          Authorization: !!js \`Bearer \${process.env.${variable}}\`` : ''}
+`
+  }
+
+  const parche = await leerTexto(PARCHE)
+  const base = parche.replace(/^\s*\[\]\s*$/m, '').trimEnd()
+  await writeFile(PARCHE, `${base}\n\n${MARCA}\n${fila}`)
+  return { nombre, variable }
+}
+
+async function quitarConexion(nombre) {
+  if (!/^[A-Za-z0-9_-]{1,32}$/.test(String(nombre ?? ''))) throw new Error('Nombre no válido')
+  const parche = await leerTexto(PARCHE)
+  const bloques = parche.split(/\n(?=- insert:)/)
+  const quedan = bloques.filter((b) => !(b.includes('dsh-mcp-client') && new RegExp(`serverName:\\s*${nombre}\\b`).test(b)))
+  if (quedan.length === bloques.length) throw new Error('No la encuentro')
+  await writeFile(PARCHE, quedan.join('\n').trimEnd() + '\n')
+  return { quitada: nombre }
+}
+
 // ── enrutado ─────────────────────────────────────────────────────────────
 
 async function cuerpoJson(req) {
@@ -209,6 +313,19 @@ export async function atenderApi(req, res, ruta) {
 
     if (ruta === 'api/modelos/openrouter' && req.method === 'GET') {
       return responder(200, { modelos: await modelosDeOpenrouter() })
+    }
+
+    if (ruta === 'api/conexiones' && req.method === 'GET') {
+      return responder(200, await listarConexiones())
+    }
+
+    if (ruta === 'api/conexiones' && req.method === 'POST') {
+      return responder(200, await anadirConexion(await cuerpoJson(req)))
+    }
+
+    if (ruta === 'api/conexiones/quitar' && req.method === 'POST') {
+      const { nombre } = await cuerpoJson(req)
+      return responder(200, await quitarConexion(nombre))
     }
 
     if (ruta === 'api/plugins/instalar' && req.method === 'POST') {
