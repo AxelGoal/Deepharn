@@ -971,8 +971,46 @@ async function abrirModelos() {
   filtro.addEventListener('input', pintar)
   filtro.addEventListener('click', (e) => e.stopPropagation())
   pintar()
-  menuModelos.replaceChildren(filtro, contenedor)
+
+  const pie = el('div', { class: 'pie-modelos' }, [
+    el('span', { class: 'peq', text: `${grupos.reduce((n, g) => n + g.models.length, 0)} modelos` }),
+    el('button', {
+      class: 'boton',
+      text: 'Actualizar desde OpenRouter',
+      onclick: async (e) => { e.stopPropagation(); await sincronizarModelos(e.target) },
+    }),
+  ])
+
+  menuModelos.replaceChildren(filtro, contenedor, pie)
   filtro.focus()
+}
+
+// Trae el catálogo real y lo declara en los ajustes del proveedor. Declarar la
+// lista sustituye a la enlatada, pero cada entrada se mezcla sobre la que el
+// harness ya conocía: los modelos de siempre conservan sus niveles de
+// razonamiento y los nuevos entran con su ventana de contexto.
+async function sincronizarModelos(boton) {
+  const original = boton.textContent
+  boton.textContent = 'Consultando…'
+  boton.disabled = true
+  try {
+    const { modelos } = await nuestraApi('modelos/openrouter')
+    const declarados = modelos.map((m) => ({
+      id: m.id,
+      name: m.name,
+      ...(m.contextWindow ? { contextWindow: m.contextWindow } : {}),
+    }))
+    await rpc('settings.update', {
+      ns: 'llm-pi-ai',
+      patch: { providers: { openrouter: { models: declarados } } },
+    })
+    const gratis = modelos.filter((m) => m.gratis).length
+    boton.textContent = `${modelos.length} modelos (${gratis} gratis)`
+    setTimeout(() => { cerrarModelos(); abrirModelos() }, 1200)
+  } catch (error) {
+    boton.textContent = 'No ha podido: ' + String(error.message).slice(0, 40)
+    setTimeout(() => { boton.textContent = original; boton.disabled = false }, 4000)
+  }
 }
 
 function cerrarModelos() {

@@ -458,3 +458,9 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 .permiso-botones { display: flex; gap: 8px; justify-content: flex-end; }
 .boton.principal { background: var(--ambar); border-color: var(--ambar); color: #fff; font-weight: 600; }
 .boton.principal:hover { filter: brightness(1.08); }
+
+.pie-modelos {
+  flex: none; display: flex; align-items: center; gap: 10px; justify-content: space-between;
+  padding-top: 8px; border-top: 1px solid var(--linea2);
+}
+.pie-modelos .boton { font-size: 12px; padding: 5px 10px; }

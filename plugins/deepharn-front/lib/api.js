@@ -149,6 +149,41 @@ async function instalarPlugin(paquete) {
   return { ...resultado, modulo, fila: true }
 }
 
+
+// ── catálogo real de OpenRouter ──────────────────────────────────────────
+//
+// El desplegable sale de un catálogo enlatado dentro del plugin del harness,
+// congelado en su versión: enseña modelos retirados —elegir uno da 404— y se
+// pierde los nuevos. Esto trae la lista de verdad.
+//
+// Se pide desde aquí, no desde la página, para no depender de CORS.
+
+let cacheModelos = { cuando: 0, lista: [] }
+
+async function modelosDeOpenrouter() {
+  const ahora = Date.now()
+  if (ahora - cacheModelos.cuando < 10 * 60 * 1000 && cacheModelos.lista.length) return cacheModelos.lista
+
+  const respuesta = await fetch('https://openrouter.ai/api/v1/models', {
+    headers: { 'accept': 'application/json' },
+    signal: AbortSignal.timeout(20000),
+  })
+  if (!respuesta.ok) throw new Error(`OpenRouter respondió ${respuesta.status}`)
+  const cuerpo = await respuesta.json()
+
+  const lista = (cuerpo.data ?? []).map((m) => ({
+    id: m.id,
+    name: m.name ?? m.id,
+    // La ventana de contexto hace falta para los modelos que el harness no
+    // conoce; los que ya conoce heredan la suya y esto no les afecta.
+    contextWindow: Number.isInteger(m.context_length) && m.context_length > 0 ? m.context_length : undefined,
+    gratis: String(m.id).endsWith(':free'),
+  })).filter((m) => m.id)
+
+  cacheModelos = { cuando: ahora, lista }
+  return lista
+}
+
 // ── enrutado ─────────────────────────────────────────────────────────────
 
 async function cuerpoJson(req) {
@@ -170,6 +205,10 @@ export async function atenderApi(req, res, ruta) {
     if (ruta === 'api/skills/enlazar' && req.method === 'POST') {
       const { nombre } = await cuerpoJson(req)
       return responder(200, await enlazarSkill(nombre))
+    }
+
+    if (ruta === 'api/modelos/openrouter' && req.method === 'GET') {
+      return responder(200, { modelos: await modelosDeOpenrouter() })
     }
 
     if (ruta === 'api/plugins/instalar' && req.method === 'POST') {
