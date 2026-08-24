@@ -28,8 +28,15 @@ derecha lo que está corriendo, lo que ha producido y lo que tiene a mano.*
 - **Selector de modelo y de esfuerzo de razonamiento**, con filtro (OpenRouter
   ofrece más de cien modelos).
 - **Ajustes** con instalador de plugins y gestor de skills, sin bajar a la terminal.
+- **Permisos con diálogo del sistema**: cuando el agente quiere salir de su carpeta,
+  la app trae el foco y te pregunta. Sin esto el turno se queda esperando en silencio.
+- **Catálogo de modelos al día**: un botón trae la lista real de OpenRouter, en vez
+  del catálogo enlatado del harness, que arrastra modelos retirados.
 - Borrar conversaciones y proyectos, renombrarlos.
 - Tres columnas plegables y modo «solo chat». Claro y oscuro.
+
+Y cuando algo falla —modelo retirado, clave caducada, cuota agotada— **se ve**:
+el error del proveedor sale en la conversación en vez de quedarse en nada.
 
 La respuesta del agente se pinta según se escribe, y el texto se renderiza como
 markdown: párrafos, viñetas, código.
@@ -120,6 +127,16 @@ rm -rf ~/.dsh/profiles/deepharn /Applications/Deepharn.app
 Nada más. El perfil que ya usabas queda intacto, y tus conversaciones también:
 viven en `~/.dsh/sessions`, fuera del perfil.
 
+## Dónde puede escribir el agente
+
+El directorio donde arranca el harness **es** el espacio de trabajo del agente, y
+con la política `workspace-write` eso es exactamente lo que puede tocar sin
+pedirte permiso. Por eso la app arranca en **`~/Deepharn`**, una carpeta suya que
+se crea sola: ahí trabaja libre, y para cualquier cosa fuera de ahí te pregunta.
+
+Merece la pena saberlo antes de cambiarlo: arrancar el harness en tu carpeta
+personal le da permiso de escritura sobre todo lo que hay en ella.
+
 ## Cómo arranca
 
 Abrir la app es lo único que hay que hacer:
@@ -155,8 +172,9 @@ plugins y las skills nuevas piden reinicio.
 Funciona y se usa a diario, pero es joven y el harness que hay debajo está en
 *developer preview*, así que rompe compatibilidad de vez en cuando.
 
-**Lo que falta:** streaming letra a letra por WebSocket (ahora sondea), adjuntar
-archivos, y un botón de reinicio que no pase por el menú.
+**Lo que falta:** que la respuesta se escriba letra a letra —los WebSocket ya
+están conectados para los permisos, falta usarlos también para el texto— y
+adjuntar archivos.
 
 ## Licencia
 
