@@ -5,10 +5,10 @@
 // y lanzar procesos. Todo esto solo escucha en 127.0.0.1.
 
 import { spawn } from 'node:child_process'
-import { readFile, writeFile, readdir, symlink, lstat, realpath } from 'node:fs/promises'
+import { readFile, writeFile, readdir, symlink, lstat, realpath, mkdir, stat } from 'node:fs/promises'
 import { existsSync, readdirSync } from 'node:fs'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { join, resolve, relative, extname, basename } from 'node:path'
 
 const CASA = homedir()
 const SKILLS_AGENTES = join(CASA, '.agents', 'skills')
@@ -178,6 +178,9 @@ async function modelosDeOpenrouter() {
     // conoce; los que ya conoce heredan la suya y esto no les afecta.
     contextWindow: Number.isInteger(m.context_length) && m.context_length > 0 ? m.context_length : undefined,
     gratis: String(m.id).endsWith(':free'),
+    // Hace falta para avisar antes de enviar: la mayoría de modelos no
+    // aceptan imágenes, y el error solo sale al pulsar enviar.
+    imagen: (m.architecture?.input_modalities ?? []).includes('image'),
   })).filter((m) => m.id)
 
   cacheModelos = { cuando: ahora, lista }
@@ -290,6 +293,82 @@ async function quitarConexion(nombre) {
 
 // ── enrutado ─────────────────────────────────────────────────────────────
 
+// ── archivos del espacio de trabajo ──────────────────────────────────────
+//
+// Este plugin corre dentro de dsh, así que process.cwd() ES la carpeta del
+// espacio de trabajo. La usamos como raíz y no aceptamos rutas del cliente:
+// solo subrutas, y comprobadas. Así el navegador no puede pedir /etc/passwd.
+
+const RAIZ = () => process.cwd()
+
+/** Resuelve una subruta dentro del espacio, o falla si intenta salirse. */
+function dentro(sub) {
+  const raiz = RAIZ()
+  const destino = resolve(raiz, sub ?? '')
+  if (destino !== raiz && !destino.startsWith(raiz + '/')) {
+    throw new Error('Esa ruta se sale del espacio de trabajo')
+  }
+  return destino
+}
+
+// Lo que no tiene sentido enseñar en un selector de archivos.
+const INVISIBLES = new Set(['.git', 'node_modules', '.DS_Store', '.dsh', '.venv', '__pycache__', 'dist', 'build'])
+
+async function listarArchivos(sub) {
+  const carpeta = dentro(sub)
+  const entradas = await readdir(carpeta, { withFileTypes: true }).catch(() => [])
+
+  const filas = []
+  for (const e of entradas) {
+    if (e.name.startsWith('.') || INVISIBLES.has(e.name)) continue
+    const info = await stat(join(carpeta, e.name)).catch(() => undefined)
+    filas.push({
+      nombre: e.name,
+      carpeta: e.isDirectory(),
+      tamano: e.isDirectory() ? 0 : (info?.size ?? 0),
+      ruta: relative(RAIZ(), join(carpeta, e.name)),
+    })
+  }
+
+  // Carpetas primero y por orden alfabético: se busca con la vista, no leyendo.
+  filas.sort((a, b) => (a.carpeta === b.carpeta ? a.nombre.localeCompare(b.nombre) : a.carpeta ? -1 : 1))
+  return { raiz: RAIZ(), sub: relative(RAIZ(), carpeta), entradas: filas }
+}
+
+// ── adjuntos ─────────────────────────────────────────────────────────────
+//
+// El modelo solo recibe imágenes por el prompt. Lo demás —un PDF, un csv, un
+// .md— se copia a <espacio>/adjuntos/ y en el mensaje va la ruta: el agente lo
+// abre con sus propias herramientas, que para eso las tiene.
+
+const TOPE = 20 * 1024 * 1024
+
+/** Quita todo lo que pueda convertir un nombre de archivo en una ruta. */
+function nombreSeguro(nombre) {
+  const limpio = basename(String(nombre ?? '')).replace(/[^\w.\- ]+/g, '_').replace(/^\.+/, '').trim()
+  if (!limpio) throw new Error('Ese nombre de archivo no vale')
+  return limpio.slice(0, 120)
+}
+
+async function guardarAdjunto({ nombre, datos }) {
+  const bytes = Buffer.from(String(datos ?? ''), 'base64')
+  if (!bytes.length) throw new Error('El archivo ha llegado vacío')
+  if (bytes.length > TOPE) throw new Error(`Ese archivo pesa demasiado (máximo ${TOPE / 1024 / 1024} MB)`)
+
+  const carpeta = join(RAIZ(), 'adjuntos')
+  await mkdir(carpeta, { recursive: true })
+
+  // Si ya hay uno con ese nombre, numeramos en vez de pisarlo.
+  let final = nombreSeguro(nombre)
+  const ext = extname(final)
+  const raso = final.slice(0, final.length - ext.length)
+  let n = 2
+  while (existsSync(join(carpeta, final))) final = `${raso}-${n++}${ext}`
+
+  await writeFile(join(carpeta, final), bytes)
+  return { ruta: join('adjuntos', final), absoluta: join(carpeta, final), bytes: bytes.length }
+}
+
 async function cuerpoJson(req) {
   const trozos = []
   for await (const t of req) trozos.push(t)
@@ -326,6 +405,15 @@ export async function atenderApi(req, res, ruta) {
     if (ruta === 'api/conexiones/quitar' && req.method === 'POST') {
       const { nombre } = await cuerpoJson(req)
       return responder(200, await quitarConexion(nombre))
+    }
+
+    if (ruta === 'api/archivos' && req.method === 'GET') {
+      const sub = new URL(req.url ?? '/', 'http://localhost').searchParams.get('sub') ?? ''
+      return responder(200, await listarArchivos(sub))
+    }
+
+    if (ruta === 'api/adjuntos' && req.method === 'POST') {
+      return responder(200, await guardarAdjunto(await cuerpoJson(req)))
     }
 
     if (ruta === 'api/plugins/instalar' && req.method === 'POST') {

@@ -316,6 +316,45 @@ function formatear(texto) {
   return raiz
 }
 
+function imagenesDe(contenido) {
+  if (!Array.isArray(contenido)) return []
+  const vistas = new Set()
+  return contenido
+    .filter((b) => b?.type === 'image' && b.attachment?.attachmentId)
+    .map((b) => b.attachment)
+    // El mismo adjunto puede venir repetido dentro de un mensaje.
+    .filter((a) => (vistas.has(a.attachmentId) ? false : vistas.add(a.attachmentId)))
+}
+
+const miniaturas = new Map()
+
+function tirasDeImagenes(adjuntadas) {
+  const tira = el('div', { class: 'imagenes-msg' })
+
+  for (const a of adjuntadas) {
+    const hueco = el('img', {
+      class: 'imagen-msg',
+      alt: 'Imagen adjunta',
+      title: `${a.mediaType} · ${a.width}×${a.height}`,
+      src: miniaturas.get(a.attachmentId) ?? '',
+    })
+    tira.append(hueco)
+
+    if (!miniaturas.has(a.attachmentId)) {
+      // El log guarda el identificador, no los bytes: hay que pedirlos.
+      rpc('session.attachment', { sessionId: estado.actual, attachmentId: a.attachmentId })
+        .then((r) => {
+          const url = `data:${r.attachment?.mediaType ?? a.mediaType};base64,${r.data}`
+          miniaturas.set(a.attachmentId, url)
+          hueco.src = url
+        })
+        .catch(() => { hueco.replaceWith(el('span', { class: 'peq', text: 'imagen adjunta' })) })
+    }
+  }
+
+  return tira
+}
+
 function textoDe(contenido) {
   if (!Array.isArray(contenido)) return ''
   return contenido
@@ -371,10 +410,14 @@ function pintarHilo(forzar = false) {
       // skills…). Solo lo tuyo se pinta.
       if (ev.data?.source?.kind !== 'user') continue
       const texto = textoDe(ev.data?.content)
-      if (!texto) continue
+      const imagenes = imagenesDe(ev.data?.content)
+      if (!texto && !imagenes.length) continue
       interior.append(el('div', { class: 'msg usuario' }, [
         el('div', { class: 'meta mono', text: hora(ev.time) }),
-        el('div', { class: 'burbuja' }, [el('div', { class: 'cuerpo-texto' }, [formatear(texto)])]),
+        el('div', { class: 'burbuja' }, [
+          imagenes.length ? tirasDeImagenes(imagenes) : null,
+          texto ? el('div', { class: 'cuerpo-texto' }, [formatear(texto)]) : null,
+        ]),
       ]))
       pintados++
     }
@@ -709,7 +752,7 @@ function crecerCaja() {
 
 async function enviar() {
   const texto = caja.value.trim()
-  if (!texto || estado.enviando) return
+  if ((!texto && !adjuntos.length) || estado.enviando) return
 
   if (!estado.actual) {
     await nuevaConversacion()
@@ -723,17 +766,39 @@ async function enviar() {
   document.querySelector('.caja').classList.add('enviando')
 
   try {
+    // Las imágenes viajan dentro del mensaje; los demás archivos ya están en
+    // el espacio de trabajo, así que basta con decirle al agente dónde miran.
+    const enDisco = adjuntos.filter((a) => !a.imagen)
+    const nota = enDisco.length
+      ? (texto ? texto + '\n\n' : '') +
+        'Archivos adjuntos, en el espacio de trabajo:\n' +
+        enDisco.map((a) => `- ${a.ruta}`).join('\n')
+      : texto
+
+    const contenido = [
+      ...adjuntos.filter((a) => a.imagen).map((a) => ({ type: 'image', mediaType: a.mediaType, data: a.datos })),
+      ...(nota ? [{ type: 'text', text: nota }] : []),
+    ]
+
     await rpc('session.prompt', {
       sessionId: estado.actual,
       mode: modo,
-      content: [{ type: 'text', text: texto }],
+      content: contenido,
     })
     caja.value = ''
+    adjuntos.length = 0
+    pintarAdjuntos()
     crecerCaja()
     // Pintar la respuesta según llega: mientras haya turno vivo, refresco corto.
     seguirDeCerca()
   } catch (error) {
-    avisar(`No he podido enviarlo: ${error.message}`)
+    if (/does not support image input/i.test(error.message)) {
+      // El harness mira su propio registro de modelos, no lo que diga el
+      // proveedor. Si el catálogo está viejo, un modelo con visión se rechaza.
+      avisar('Este modelo no admite imágenes según el registro del harness. Si sabes que sí las lee, actualiza el catálogo en Ajustes › Modelos y vuelve a intentarlo; si no, elige otro modelo.')
+    } else {
+      avisar(`No he podido enviarlo: ${error.message}`)
+    }
   } finally {
     estado.enviando = false
     document.querySelector('.caja').classList.remove('enviando')
@@ -1360,11 +1425,15 @@ async function sincronizarModelos(boton) {
       id: m.id,
       name: m.name,
       ...(m.contextWindow ? { contextWindow: m.contextWindow } : {}),
+      // Sin declarar la modalidad, el harness supone que el modelo solo lee
+      // texto y rechaza cualquier imagen aunque el modelo la admita.
+      ...(m.imagen ? { input: ['text', 'image'] } : {}),
     }))
     await rpc('settings.update', {
       ns: 'llm-pi-ai',
       patch: { providers: { openrouter: { models: declarados } } },
     })
+    catalogoImagen = null
     const gratis = modelos.filter((m) => m.gratis).length
     boton.textContent = `${modelos.length} modelos (${gratis} gratis)`
     setTimeout(() => { cerrarModelos(); abrirModelos() }, 1200)
@@ -1384,6 +1453,7 @@ async function elegirModelo(provider, model) {
   try {
     await rpc('session.selectModel', { sessionId: estado.actual, provider, model })
     $('modelo').textContent = model
+    catalogoImagen = null
     await refrescar()
   } catch (error) {
     avisar(`No he podido cambiar el modelo: ${error.message}`)
@@ -1689,6 +1759,247 @@ for (const cab of document.querySelectorAll('.panel-cabecera')) {
 $('buscar').addEventListener('input', () => pintarLista(true))
 $('plegar-izq').classList.add('activo')
 $('plegar-der').classList.add('activo')
+
+
+// ── adjuntar ─────────────────────────────────────────────────────────────
+//
+// El harness solo admite dos tipos de contenido en session.prompt: "text" e
+// "image". Así que hay dos caminos:
+//
+//   · Una imagen (png, jpeg, webp o gif) viaja dentro del mensaje, en base64,
+//     y el modelo la ve.
+//   · Cualquier otra cosa —un PDF, un csv, un .md— se copia a la carpeta
+//     adjuntos/ del espacio de trabajo y en el mensaje va su ruta. El agente
+//     tiene herramientas para abrir archivos: se lo decimos y lo lee él.
+//
+// De cara a ti la diferencia no se nota: eliges el archivo y ya está.
+
+const IMAGENES_QUE_ADMITE = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/gif'])
+const TOPE_IMAGEN = 6 * 1024 * 1024
+
+// Lo pendiente de enviar: se vacía con cada mensaje.
+const adjuntos = []
+
+function pesar(bytes) {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
+function leerBase64(archivo) {
+  return new Promise((resolve, reject) => {
+    const lector = new FileReader()
+    // El resultado viene como data:<tipo>;base64,<datos>; nos quedamos con los datos.
+    lector.onload = () => resolve(String(lector.result).split(',')[1] ?? '')
+    lector.onerror = () => reject(new Error('No he podido leer el archivo'))
+    lector.readAsDataURL(archivo)
+  })
+}
+
+function iconoSvg(d) {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  svg.setAttribute('class', 'icono-mini')
+  svg.setAttribute('viewBox', '0 0 24 24')
+  const p = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  p.setAttribute('d', d)
+  svg.append(p)
+  return svg
+}
+
+const ICONO_CARPETA = 'M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z'
+const ICONO_HOJA = 'M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8zM14 3v5h5'
+
+function pintarAdjuntos() {
+  const caja = $('adjuntos')
+  caja.textContent = ''
+  caja.classList.toggle('oculto', adjuntos.length === 0)
+
+  adjuntos.forEach((a, i) => {
+    const quitar = el('button', {
+      class: 'adjunto-quitar', text: '✕', title: 'Quitar',
+      onclick: () => { adjuntos.splice(i, 1); pintarAdjuntos() },
+    })
+
+    caja.append(el('div', { class: 'adjunto' }, [
+      a.miniatura ? el('img', { src: a.miniatura, alt: '' }) : iconoSvg(ICONO_HOJA),
+      el('div', { class: 'adjunto-datos' }, [
+        el('span', { class: 'adjunto-nombre', text: a.nombre, title: a.ruta ?? a.nombre }),
+        el('span', { class: 'adjunto-peso', text: a.imagen ? `imagen · ${pesar(a.bytes)}` : `${a.ruta} · ${pesar(a.bytes)}` }),
+      ]),
+      quitar,
+    ]))
+  })
+}
+
+async function tomarArchivos(lista) {
+  for (const archivo of lista) {
+    try {
+      if (IMAGENES_QUE_ADMITE.has(archivo.type)) {
+        if (archivo.size > TOPE_IMAGEN) {
+          avisar(`«${archivo.name}» pesa ${pesar(archivo.size)}: para mandarla al modelo tiene que bajar de ${pesar(TOPE_IMAGEN)}.`)
+          continue
+        }
+        const datos = await leerBase64(archivo)
+        adjuntos.push({
+          nombre: archivo.name, bytes: archivo.size, imagen: true,
+          mediaType: archivo.type, datos,
+          miniatura: `data:${archivo.type};base64,${datos}`,
+        })
+      } else {
+        // Lo que el modelo no puede mirar, lo dejamos donde el agente sí llega.
+        const datos = await leerBase64(archivo)
+        const r = await nuestraApi('adjuntos', {
+          method: 'POST', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ nombre: archivo.name, datos }),
+        })
+        adjuntos.push({ nombre: archivo.name, bytes: r.bytes, imagen: false, ruta: r.ruta })
+      }
+    } catch (error) {
+      avisar(`«${archivo.name}»: ${error.message}`)
+    }
+  }
+  pintarAdjuntos()
+  avisarSiElModeloNoVeImagenes()
+  caja.focus()
+}
+
+// Casi ningún modelo de texto acepta imágenes, y el harness solo lo dice al
+// pulsar enviar. Como el catálogo de OpenRouter sí trae la modalidad de
+// entrada, lo miramos al adjuntar y avisamos con tiempo.
+
+let catalogoImagen = null
+
+async function avisarSiElModeloNoVeImagenes() {
+  if (!adjuntos.some((a) => a.imagen)) return
+
+  const actual = $('modelo').textContent.trim()
+  if (!actual || actual === '—') return
+
+  try {
+    if (!catalogoImagen) {
+      const { modelos } = await nuestraApi('modelos/openrouter')
+      catalogoImagen = new Map(modelos.map((m) => [m.id, m.imagen]))
+    }
+  } catch { return }   // sin catálogo no opinamos: ya avisará el envío
+
+  // Lo que no está en el catálogo no lo juzgamos: callar es mejor que soltar
+  // un aviso falso sobre un modelo que no conocemos.
+  if (catalogoImagen.get(actual) !== false) return
+
+  avisar(`«${actual}» no lee imágenes. Elige otro modelo en la pastilla de arriba, o quita la imagen y descríbesela.`)
+}
+
+$('btn-adjuntar').addEventListener('click', () => $('selector-archivo').click())
+$('selector-archivo').addEventListener('change', async (e) => {
+  await tomarArchivos([...e.target.files])
+  e.target.value = ''   // para que puedas volver a elegir el mismo archivo
+})
+
+// Arrastrar y soltar sobre el compositor, y pegar una imagen del portapapeles.
+const cajaCompositor = document.querySelector('.caja')
+for (const evento of ['dragenter', 'dragover']) {
+  cajaCompositor.addEventListener(evento, (e) => { e.preventDefault(); cajaCompositor.classList.add('soltando') })
+}
+for (const evento of ['dragleave', 'drop']) {
+  cajaCompositor.addEventListener(evento, () => cajaCompositor.classList.remove('soltando'))
+}
+cajaCompositor.addEventListener('drop', (e) => {
+  e.preventDefault()
+  if (e.dataTransfer?.files?.length) tomarArchivos([...e.dataTransfer.files])
+})
+caja.addEventListener('paste', (e) => {
+  const pegados = [...(e.clipboardData?.items ?? [])]
+    .filter((i) => i.kind === 'file')
+    .map((i) => i.getAsFile())
+    .filter(Boolean)
+  if (pegados.length) { e.preventDefault(); tomarArchivos(pegados) }
+})
+
+// ── @ Archivos ───────────────────────────────────────────────────────────
+//
+// Un paseo por la carpeta del espacio de trabajo para meter una ruta en el
+// mensaje sin tener que escribirla. No sube nada: el archivo ya está ahí y el
+// agente lo abre cuando le nombras la ruta.
+
+async function abrirArchivos() {
+  const velo_ = el('div', { class: 'velo' })
+  const cerrar = () => velo_.remove()
+
+  const migas = el('div', { class: 'migas' })
+  const lista = el('div', { class: 'lista-archivos' })
+
+  async function ir(sub) {
+    lista.textContent = ''
+    migas.textContent = ''
+    let datos
+    try {
+      datos = await nuestraApi('archivos?sub=' + encodeURIComponent(sub))
+    } catch (error) {
+      lista.append(el('div', { class: 'nada', text: 'No he podido leer la carpeta: ' + error.message }))
+      return
+    }
+
+    // Migas: la raíz y cada tramo del camino, todos pinchables.
+    const tramos = datos.sub ? datos.sub.split('/') : []
+    migas.append(el('button', { text: datos.raiz.split('/').filter(Boolean).pop() || '/', onclick: () => ir('') }))
+    tramos.forEach((t, i) => {
+      migas.append(el('span', { text: '/' }))
+      migas.append(el('button', { text: t, onclick: () => ir(tramos.slice(0, i + 1).join('/')) }))
+    })
+
+    if (datos.sub) {
+      lista.append(el('button', { class: 'fila-archivo', onclick: () => ir(tramos.slice(0, -1).join('/')) }, [
+        iconoSvg(ICONO_CARPETA), el('span', { text: '..' }),
+      ]))
+    }
+
+    if (!datos.entradas.length) {
+      lista.append(el('div', { class: 'nada', text: 'Esta carpeta está vacía.' }))
+      return
+    }
+
+    for (const e of datos.entradas) {
+      lista.append(el('button', { class: 'fila-archivo', onclick: () => {
+        if (e.carpeta) return ir(e.ruta)
+        insertarEnCaja('@' + e.ruta + ' ')
+        cerrar()
+      } }, [
+        iconoSvg(e.carpeta ? ICONO_CARPETA : ICONO_HOJA),
+        el('span', { text: e.nombre }),
+        el('em', { text: e.carpeta ? '' : pesar(e.tamano) }),
+      ]))
+    }
+  }
+
+  velo_.append(el('div', { class: 'modal' }, [
+    el('header', {}, [
+      el('strong', { text: 'Archivos del espacio de trabajo' }),
+      el('span', { class: 'crece' }),
+      el('button', { class: 'boton', text: 'Cerrar', onclick: cerrar }),
+    ]),
+    el('div', { class: 'modal-cuerpo' }, [
+      el('div', { class: 'nada', text: 'Elige un archivo y su ruta va al mensaje. El agente lo abre desde ahí.' }),
+      migas,
+      lista,
+    ]),
+  ]))
+
+  velo_.addEventListener('click', (e) => { if (e.target === velo_) cerrar() })
+  document.body.append(velo_)
+  ir('')
+}
+
+/** Mete texto donde tengas el cursor, sin pisar lo que ya hubiera escrito. */
+function insertarEnCaja(texto) {
+  const i = caja.selectionStart ?? caja.value.length
+  const j = caja.selectionEnd ?? i
+  caja.value = caja.value.slice(0, i) + texto + caja.value.slice(j)
+  caja.selectionStart = caja.selectionEnd = i + texto.length
+  crecerCaja()
+  caja.focus()
+}
+
+$('btn-archivos').addEventListener('click', abrirArchivos)
 
 // ── arranque ─────────────────────────────────────────────────────────────
 

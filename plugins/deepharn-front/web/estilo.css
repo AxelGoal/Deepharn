@@ -245,7 +245,48 @@ svg { width: 1em; height: 1em; fill: none; stroke: currentColor; stroke-width: 1
 .caja-texto::placeholder { color: var(--texto4); }
 .caja.enviando { opacity: .6; pointer-events: none; }
 .caja-pie { display: flex; align-items: center; gap: 10px; padding: 8px 10px 10px 14px; border-top: 1px solid var(--linea2); }
-.mini { font-size: 12.5px; color: var(--texto3); border: 1px solid var(--linea2); border-radius: 7px; padding: 4px 9px; }
+.mini {
+  font-size: 12.5px; color: var(--texto3); border: 1px solid var(--linea2); border-radius: 7px;
+  padding: 4px 9px; display: inline-flex; align-items: center; gap: 5px; background: none;
+}
+.mini:hover { color: var(--tinta); border-color: var(--linea); background: var(--panel2); }
+.icono-mini { width: 13px; height: 13px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* Adjuntos: fichas encima del texto, con su miniatura si es imagen. */
+.adjuntos { display: flex; flex-wrap: wrap; gap: 7px; padding: 12px 14px 0; }
+.adjunto {
+  display: inline-flex; align-items: center; gap: 7px; max-width: 260px;
+  background: var(--panel2); border: 1px solid var(--linea); border-radius: 9px; padding: 5px 6px 5px 7px;
+}
+.adjunto img { width: 26px; height: 26px; object-fit: cover; border-radius: 5px; flex: none; }
+.adjunto .icono-mini { flex: none; }
+.adjunto-datos { min-width: 0; display: flex; flex-direction: column; }
+.adjunto-nombre { font-size: 12.5px; color: var(--tinta); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.adjunto-peso { font-size: 10.5px; color: var(--texto4); }
+.adjunto-quitar { width: 18px; height: 18px; border-radius: 5px; color: var(--texto4); flex: none; font-size: 13px; line-height: 1; }
+.adjunto-quitar:hover { color: var(--tinta); background: var(--linea2); }
+.caja.soltando { border-color: var(--marca); box-shadow: 0 0 0 3px var(--marca-suave); }
+
+/* Lo que enviaste con el mensaje, dentro de la burbuja. */
+.imagenes-msg { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+.imagen-msg {
+  max-width: 220px; max-height: 160px; border-radius: 8px; display: block;
+  border: 1px solid var(--linea); background: var(--panel2);
+}
+
+/* Selector de archivos del espacio de trabajo. */
+.migas { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; font-size: 12px; margin-bottom: 8px; }
+.migas button { color: var(--marca); }
+.migas span { color: var(--texto4); }
+.lista-archivos { max-height: 46vh; overflow-y: auto; border: 1px solid var(--linea2); border-radius: 10px; }
+.fila-archivo {
+  display: flex; align-items: center; gap: 9px; width: 100%; text-align: left;
+  padding: 8px 11px; border-bottom: 1px solid var(--linea2); font-size: 13px; color: var(--tinta);
+}
+.fila-archivo:last-child { border-bottom: 0; }
+.fila-archivo:hover { background: var(--panel2); }
+.fila-archivo .icono-mini { color: var(--texto3); }
+.fila-archivo em { margin-left: auto; font-style: normal; font-size: 11px; color: var(--texto4); }
 .crece { flex: 1; }
 .peq { font-size: 11px; color: var(--texto4); }
 .enviar { width: 32px; height: 32px; border-radius: 9px; background: var(--marca); color: #fff; display: grid; place-items: center; }

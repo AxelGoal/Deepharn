@@ -98,10 +98,15 @@
 
       <div class="compositor">
         <div class="caja">
+          <div class="adjuntos oculto" id="adjuntos"></div>
           <textarea class="caja-texto" id="caja-texto" rows="1" placeholder="Escribe y pulsa Enter…"></textarea>
+          <input type="file" id="selector-archivo" multiple hidden>
           <div class="caja-pie">
-            <span class="mini">Adjuntar</span>
-            <span class="mini mono">@ Archivos</span>
+            <button class="mini" id="btn-adjuntar" title="Adjuntar imágenes o archivos (también puedes arrastrarlos aquí)">
+              <svg viewBox="0 0 24 24" class="icono-mini"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg>
+              Adjuntar
+            </button>
+            <button class="mini mono" id="btn-archivos" title="Insertar la ruta de un archivo del espacio de trabajo">@ Archivos</button>
             <span class="crece"></span>
             <span class="mono peq" id="tokens-sesion"></span>
             <button class="enviar" id="enviar" aria-label="Enviar">
