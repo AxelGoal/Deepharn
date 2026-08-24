@@ -155,6 +155,24 @@ Abrir la app es lo único que hay que hacer:
 Está en [COMO-ESTA-HECHO.md](COMO-ESTA-HECHO.md): la API del harness, sus métodos
 y sus trampas. Si vas a construir algo parecido, ahí tienes el mapa.
 
+## Qué ejecuta y con qué límites
+
+Deepharn lanza procesos, así que conviene decir cuáles y por qué —los escáneres
+automáticos del ecosistema lo marcan, y con razón:
+
+- **`dsh` como proceso hijo.** La app arranca el harness al abrirse y lo para al
+  salir. Si ya había uno sirviendo, se engancha y no mata nada al cerrarse.
+- **`dsh plugin add`**, solo cuando pulsas *Instalar* en Ajustes, con el paquete
+  que hayas escrito. Rechaza nombres con caracteres de shell y no usa intérprete.
+
+Los endpoints propios (`/deepharn/api/…`) viven dentro del servidor del harness,
+que **solo escucha en `127.0.0.1`**. Ese servidor no tiene autenticación, así que
+tampoco la tienen: quien pueda ejecutar código en tu Mac ya podía hacer lo mismo
+por otras vías. No expongas el puerto a la red.
+
+Y lo que de verdad decide qué puede tocar el agente no es esto, sino su espacio
+de trabajo — el apartado de arriba.
+
 ## Trastear
 
 El frontend está en `plugins/deepharn-front/web/`: tres archivos, sin compilación.
