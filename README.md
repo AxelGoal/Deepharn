@@ -127,6 +127,21 @@ rm -rf ~/.dsh/profiles/deepharn /Applications/Deepharn.app
 Nada más. El perfil que ya usabas queda intacto, y tus conversaciones también:
 viven en `~/.dsh/sessions`, fuera del perfil.
 
+## La búsqueda web
+
+El harness busca con la API de DeepSeek, que es de pago: si esa cuenta se queda
+sin saldo, el agente responde «Insufficient Balance» y deja de buscar.
+
+Hay proveedores gratuitos en el ecosistema que sustituyen al de fábrica. El más
+usado es [ModSearch](https://github.com/liustack/modsearch) —MIT, sin clave, sobre
+la capa gratuita de Firecrawl— y se instala desde la caja de plugins de Ajustes:
+
+```
+@liustack/modsearch
+```
+
+Trae su propio bundle, así que se activa solo. Reinicia con ⇧⌘R después.
+
 ## Dónde puede escribir el agente
 
 El directorio donde arranca el harness **es** el espacio de trabajo del agente, y
