@@ -86,7 +86,7 @@ func colaDelRegistro(_ lineas: Int = 6) -> String {
 
 // ── Aplicación ───────────────────────────────────────────────────────────────
 
-final class Deepharn: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKScriptMessageHandler {
+final class Deepharn: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
 
     var ventana: NSWindow!
     var web: WKWebView!
@@ -224,6 +224,10 @@ final class Deepharn: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
 
         web = WKWebView(frame: .zero, configuration: configuracion)
         web.navigationDelegate = self
+        // Sin esto, un <input type="file"> de la página no abre nada: WKWebView
+        // no trae selector de archivos propio, lo pide a la app y, si la app no
+        // contesta, se queda callado. Lo mismo con alert, confirm y prompt.
+        web.uiDelegate = self
         web.autoresizingMask = [.width, .height]
         web.isHidden = true
 
@@ -322,6 +326,95 @@ final class Deepharn: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
         // El canje redirige a «/», así que al terminar ya estamos dentro.
         guard canjeando else { return }
         canjeando = false
+    }
+
+
+    // ── Diálogos de la página ────────────────────────────────────────────────
+    //
+    // WKWebView no implementa por su cuenta nada de lo que un navegador da por
+    // hecho: ni selector de archivos, ni alert, ni confirm, ni prompt. Se los
+    // pide a la app, y si la app calla, la página se queda esperando para
+    // siempre. De ahí que el botón de adjuntar no hiciera nada.
+
+    func webView(_ vista: WKWebView,
+                 runOpenPanelWith parametros: WKOpenPanelParameters,
+                 initiatedByFrame marco: WKFrameInfo,
+                 completionHandler responder: @escaping ([URL]?) -> Void) {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = parametros.allowsMultipleSelection
+        panel.canChooseDirectories = parametros.allowsDirectories
+        panel.canChooseFiles = true
+        panel.resolvesAliases = true
+
+        let responderEnPrincipal: ([URL]?) -> Void = { urls in
+            DispatchQueue.main.async { responder(urls) }
+        }
+
+        if let ventana = vista.window {
+            panel.beginSheetModal(for: ventana) { respuesta in
+                responderEnPrincipal(respuesta == .OK ? panel.urls : nil)
+            }
+        } else {
+            responderEnPrincipal(panel.runModal() == .OK ? panel.urls : nil)
+        }
+    }
+
+    func webView(_ vista: WKWebView,
+                 runJavaScriptAlertPanelWithMessage mensaje: String,
+                 initiatedByFrame marco: WKFrameInfo,
+                 completionHandler terminar: @escaping () -> Void) {
+        let alerta = NSAlert()
+        alerta.messageText = "Deepharn"
+        alerta.informativeText = mensaje
+        alerta.addButton(withTitle: "Vale")
+        alerta.runModal()
+        terminar()
+    }
+
+    func webView(_ vista: WKWebView,
+                 runJavaScriptConfirmPanelWithMessage mensaje: String,
+                 initiatedByFrame marco: WKFrameInfo,
+                 completionHandler responder: @escaping (Bool) -> Void) {
+        let alerta = NSAlert()
+        alerta.messageText = "Deepharn"
+        alerta.informativeText = mensaje
+        alerta.addButton(withTitle: "Aceptar")
+        alerta.addButton(withTitle: "Cancelar")
+        responder(alerta.runModal() == .alertFirstButtonReturn)
+    }
+
+    func webView(_ vista: WKWebView,
+                 runJavaScriptTextInputPanelWithPrompt aviso: String,
+                 defaultText porDefecto: String?,
+                 initiatedByFrame marco: WKFrameInfo,
+                 completionHandler responder: @escaping (String?) -> Void) {
+        let alerta = NSAlert()
+        alerta.messageText = "Deepharn"
+        alerta.informativeText = aviso
+        alerta.addButton(withTitle: "Aceptar")
+        alerta.addButton(withTitle: "Cancelar")
+
+        let campo = NSTextField(frame: NSRect(x: 0, y: 0, width: 320, height: 24))
+        campo.stringValue = porDefecto ?? ""
+        alerta.accessoryView = campo
+        alerta.window.initialFirstResponder = campo
+
+        responder(alerta.runModal() == .alertFirstButtonReturn ? campo.stringValue : nil)
+    }
+
+    /// Un enlace con target="_blank" no tiene dónde abrirse dentro de una sola
+    /// ventana: si es del harness se carga aquí, y si es de fuera, al navegador.
+    func webView(_ vista: WKWebView,
+                 createWebViewWith configuracion: WKWebViewConfiguration,
+                 for accion: WKNavigationAction,
+                 windowFeatures caracteristicas: WKWindowFeatures) -> WKWebView? {
+        guard let destino = accion.request.url else { return nil }
+        if destino.host == "127.0.0.1" || destino.host == "localhost" {
+            vista.load(URLRequest(url: destino))
+        } else {
+            NSWorkspace.shared.open(destino)
+        }
+        return nil
     }
 
     // ── Permisos ─────────────────────────────────────────────────────────────
