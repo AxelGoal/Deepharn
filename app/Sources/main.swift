@@ -17,6 +17,9 @@ let perfil = "deepharn"
 func urlApp(_ puerto: Int) -> URL { URL(string: "http://127.0.0.1:\(puerto)/deepharn/")! }
 func urlSalud(_ puerto: Int) -> URL { URL(string: "http://127.0.0.1:\(puerto)/deepharn/api/skills")! }
 func urlOficial(_ puerto: Int) -> URL { URL(string: "http://127.0.0.1:\(puerto)/")! }
+/// Dónde abre la app. Desde dsh 0.1.5 su propia interfaz basta y no la tocamos:
+/// nuestro frontend sigue servido en /deepharn y se llega desde el menú.
+func urlInicio(_ puerto: Int) -> URL { urlOficial(puerto) }
 func urlCredencial(_ puerto: Int, _ ficha: String) -> URL { URL(string: "http://127.0.0.1:\(puerto)/?token=\(ficha)")! }
 
 let registro = FileManager.default.homeDirectoryForCurrentUser
@@ -272,12 +275,28 @@ final class Deepharn: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
 
         // Si el harness pide credencial y tenemos la ficha, se canjea antes de
         // entrar: el canje deja la galleta en la vista web y ya no estorba más.
+        entrar()
+    }
+
+    /// El harness escribe la ficha en su salida, y esa salida va a un archivo:
+    /// puede tardar un instante en llegar al disco después de que el servidor
+    /// ya responda. Por eso se espera a que aparezca en vez de entrar sin ella,
+    /// que es lo que deja la pantalla en «authentication required».
+    func entrar(intentos: Int = 40) {
         if let ficha = fichaDelRegistro(puertoActivo) {
+            // El canje termina en «/», que ya es la interfaz oficial: no hace
+            // falta navegar otra vez.
             canjeando = true
             web.load(URLRequest(url: urlCredencial(puertoActivo, ficha)))
-        } else {
-            web.load(URLRequest(url: urlApp(puertoActivo)))
+            return
         }
+
+        // Un harness ajeno, o una versión sin credencial: se entra tal cual.
+        guard intentos > 0, loSirvoYo else {
+            web.load(URLRequest(url: urlInicio(puertoActivo)))
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { self.entrar(intentos: intentos - 1) }
     }
 
     func mostrarAviso(_ texto: String, detalle textoDetalle: String) {
@@ -300,9 +319,9 @@ final class Deepharn: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
 
 
     func webView(_ vista: WKWebView, didFinish navegacion: WKNavigation!) {
+        // El canje redirige a «/», así que al terminar ya estamos dentro.
         guard canjeando else { return }
         canjeando = false
-        vista.load(URLRequest(url: urlApp(puertoActivo)))
     }
 
     // ── Permisos ─────────────────────────────────────────────────────────────
@@ -389,7 +408,7 @@ final class Deepharn: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
         // la página avisará de que no la tiene, que es mejor que un error seco.
         if canjeando {
             canjeando = false
-            webView.load(URLRequest(url: urlApp(puertoActivo)))
+            webView.load(URLRequest(url: urlInicio(puertoActivo)))
             return
         }
         fallo("No he podido cargar Deepharn.", detalle: error.localizedDescription)
@@ -427,8 +446,8 @@ final class Deepharn: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
         vista.addItem(withTitle: "Recargar", action: #selector(recargar), keyEquivalent: "r")
         vista.addItem(withTitle: "Pantalla completa", action: #selector(NSWindow.toggleFullScreen(_:)), keyEquivalent: "f")
         vista.addItem(.separator())
-        vista.addItem(withTitle: "Volver a Deepharn", action: #selector(irADeepharn), keyEquivalent: "0")
-        vista.addItem(withTitle: "Configuración oficial", action: #selector(irAOficial), keyEquivalent: ",")
+        vista.addItem(withTitle: "Interfaz de DeepSeek", action: #selector(irAOficial), keyEquivalent: "0")
+        vista.addItem(withTitle: "Nuestro frontend (en pruebas)", action: #selector(irADeepharn), keyEquivalent: ",")
         vista.addItem(.separator())
         vista.addItem(withTitle: "Reiniciar el harness", action: #selector(reiniciarHarness), keyEquivalent: "R")
         vista.addItem(withTitle: "Ver el registro", action: #selector(verRegistro), keyEquivalent: "l")

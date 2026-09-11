@@ -13,6 +13,16 @@ No es un tema ni un envoltorio de la interfaz oficial: es un **frontend distinto
 que habla con el harness por su API, servido desde el propio harness y metido en
 una ventana nativa.
 
+> **Compatibilidad — léelo antes de instalar.** Este frontend habla con la API
+> de **dsh 0.1.1-rc.2**, que es la versión contra la que está probado. En
+> **0.1.5** el harness renombró toda su superficie RPC (`session.list` pasó a
+> ser `session/list`, `session.models` a `session/modelCatalog`, `agentPreset.*`
+> a `agentPresets/*`), movió el WebSocket de eventos de `/api/events.mux` a
+> `/api/remote.mux` y puso `/api` detrás de una credencial de sesión que solo se
+> acuña abriendo `/?token=<ficha>`. La app ya canjea esa credencial; el resto
+> del trasplante está en marcha. Mientras tanto, en 0.1.5 la app abre la
+> interfaz oficial del harness y nuestro frontend sigue servido en `/deepharn`.
+
 ![Deepharn](docs/01-principal.png)
 
 *Tres columnas plegables: conversaciones a la izquierda, el chat en medio, y a la
