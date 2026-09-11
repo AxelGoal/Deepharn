@@ -26,11 +26,35 @@ async function rpc(method, payload = {}) {
     headers: { 'content-type': 'application/json' },
     body: JSON.stringify({ type: 'client-request', rpcId: crypto.randomUUID(), method, payload }),
   })
+  // Desde dsh 0.1.5 la API va detrás de una galleta de sesión que solo acuña
+  // `GET /?token=<ficha>`. Sin ella todo responde 401 y la app parece vacía.
+  if (respuesta.status === 401) {
+    sinCredencial()
+    throw new Error(`${method}: sin credencial`)
+  }
   if (!respuesta.ok) throw new Error(`${method}: HTTP ${respuesta.status}`)
   const sobre = await respuesta.json()
   const resultado = sobre?.result
   if (!resultado?.ok) throw new Error(`${method}: ${resultado?.error?.message ?? 'error desconocido'}`)
   return resultado.value
+}
+
+
+/** Un 401 no se arregla reintentando: hay que canjear la ficha del arranque. */
+let avisadoDeCredencial = false
+
+function sinCredencial() {
+  if (avisadoDeCredencial) return
+  avisadoDeCredencial = true
+
+  const hilo = document.getElementById('hilo')
+  if (!hilo) return
+  hilo.textContent = ''
+  hilo.append(el('div', { class: 'error-turno' }, [
+    el('strong', { text: 'El harness no me reconoce' }),
+    el('div', { class: 'detalle-error', text: 'Desde la versión 0.1.5, dsh protege su API con una credencial de sesión que se entrega al abrir la dirección con la ficha del arranque. Esta página no la tiene.' }),
+    el('div', { class: 'pista-error', text: 'Reinicia desde la app con ⇧⌘R: al arrancar el harness, ella lee la ficha del registro y la canjea. Si arrancaste el harness a mano, abre primero la dirección con ?token=… que imprime al arrancar.' }),
+  ]))
 }
 
 // ── utilidades ───────────────────────────────────────────────────────────

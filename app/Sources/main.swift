@@ -17,9 +17,34 @@ let perfil = "deepharn"
 func urlApp(_ puerto: Int) -> URL { URL(string: "http://127.0.0.1:\(puerto)/deepharn/")! }
 func urlSalud(_ puerto: Int) -> URL { URL(string: "http://127.0.0.1:\(puerto)/deepharn/api/skills")! }
 func urlOficial(_ puerto: Int) -> URL { URL(string: "http://127.0.0.1:\(puerto)/")! }
+func urlCredencial(_ puerto: Int, _ ficha: String) -> URL { URL(string: "http://127.0.0.1:\(puerto)/?token=\(ficha)")! }
 
 let registro = FileManager.default.homeDirectoryForCurrentUser
     .appendingPathComponent("Library/Logs/Deepharn.log")
+
+
+// ── Credencial del harness ───────────────────────────────────────────────────
+//
+// Desde 0.1.5 el harness protege /api con una galleta de sesión. Solo la
+// acuña `GET /?token=<ficha>`, y la ficha se imprime al arrancar:
+//
+//     dsh web: http://127.0.0.1:3081/?token=…
+//
+// Como la app es quien lanza el proceso, es quien puede leerla. Se carga esa
+// URL una vez en la vista web —la galleta va a Path=/, así que vale también
+// para /deepharn— y después se entra en nuestro frontend. Sin esto, la página
+// carga pero todas las llamadas a /api responden 401.
+
+/// Última ficha impresa en el registro para este puerto, si la hay.
+func fichaDelRegistro(_ puerto: Int) -> String? {
+    guard let texto = try? String(contentsOf: registro, encoding: .utf8) else { return nil }
+    let patron = "127.0.0.1:\(puerto)/?token="
+    // De atrás hacia delante: si el harness se ha reiniciado, vale la última.
+    guard let rango = texto.range(of: patron, options: .backwards) else { return nil }
+    let cola = texto[rango.upperBound...]
+    let ficha = cola.prefix { $0.isLetter || $0.isNumber || $0 == "-" || $0 == "_" || $0 == "." }
+    return ficha.isEmpty ? nil : String(ficha)
+}
 
 // ── Cómo lanzar el harness ───────────────────────────────────────────────────
 
@@ -67,6 +92,9 @@ final class Deepharn: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
     var reintentar: NSButton!
     var harness: Process?
     var loSirvoYo = false
+    /// Cierto mientras se canjea la ficha: la siguiente navegación que termine
+    /// ya trae la galleta, y es entonces cuando se entra en nuestro frontend.
+    var canjeando = false
     var puertoActivo = puertos[0]
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -241,7 +269,15 @@ final class Deepharn: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
         detalle.isHidden = true
         reintentar.isHidden = true
         web.isHidden = false
-        web.load(URLRequest(url: urlApp(puertoActivo)))
+
+        // Si el harness pide credencial y tenemos la ficha, se canjea antes de
+        // entrar: el canje deja la galleta en la vista web y ya no estorba más.
+        if let ficha = fichaDelRegistro(puertoActivo) {
+            canjeando = true
+            web.load(URLRequest(url: urlCredencial(puertoActivo, ficha)))
+        } else {
+            web.load(URLRequest(url: urlApp(puertoActivo)))
+        }
     }
 
     func mostrarAviso(_ texto: String, detalle textoDetalle: String) {
@@ -261,6 +297,13 @@ final class Deepharn: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
     }
 
     @objc func volverAIntentar() { arrancar() }
+
+
+    func webView(_ vista: WKWebView, didFinish navegacion: WKNavigation!) {
+        guard canjeando else { return }
+        canjeando = false
+        vista.load(URLRequest(url: urlApp(puertoActivo)))
+    }
 
     // ── Permisos ─────────────────────────────────────────────────────────────
 
@@ -342,6 +385,13 @@ final class Deepharn: NSObject, NSApplicationDelegate, WKNavigationDelegate, WKS
     }
 
     func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+        // Si lo que ha fallado es el canje de la credencial, se entra igual:
+        // la página avisará de que no la tiene, que es mejor que un error seco.
+        if canjeando {
+            canjeando = false
+            webView.load(URLRequest(url: urlApp(puertoActivo)))
+            return
+        }
         fallo("No he podido cargar Deepharn.", detalle: error.localizedDescription)
     }
 
